@@ -1,0 +1,25 @@
+{
+  "name": "school-information-system",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node node_modules/vite/bin/vite.js --port 5260",
+    "build": "node node_modules/vite/bin/vite.js build",
+    "preview": "node node_modules/vite/bin/vite.js preview --port 5260"
+  },
+  "dependencies": {
+    "jspdf": "2.5.2",
+    "jspdf-autotable": "3.8.4",
+    "lucide-react": "^1.46.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tailwindcss": "4.3.3",
+    "vite": "^8.3.0"
+  }
+}
