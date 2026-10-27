@@ -49,6 +49,8 @@ Parents have two ways to pay from the portal:
 1. **Pay now (MTN MoMo / Orange Money):** the parent enters their number and approves the prompt on their phone. The payment is recorded and the receipt is ready straight away.
 2. **"I've already paid":** the parent pays the school's MoMo number (`*126#` / `#150#`) or bank account, then submits the transaction ID and an optional screenshot. The bursar checks it against the school's statement under **Parent Payments** and confirms or rejects it.
 
+**Notifications:** the bursar and proprietor are notified as soon as a parent pays online or submits a payment to verify. The parent is notified when their payment is confirmed or rejected. Each notification appears on the header bell (unread count, click to open the right page), as a pop-up, and optionally as a desktop alert. Because data currently lives in the browser, the live alert reaches the bursar when they use the same browser (any open tab updates instantly). Alerts on the bursar's own device need the shared backend, which could also send SMS, WhatsApp or email.
+
 Each payment clears the pupil's oldest unpaid term first. A transaction ID can't be used twice. The school's MoMo numbers and bank account are set under School Profile → System Settings.
 
 **"Pay now" runs in demo mode.** No money moves; the phone prompt is simulated, and a number ending in `000` simulates a declined payment. Taking real money needs two things:

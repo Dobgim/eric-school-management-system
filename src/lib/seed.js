@@ -460,6 +460,12 @@ export async function buildSeed() {
     items: [{ studentId: firstChild.id, amount: 5000 }], amount: 5000,
     note: 'Paid through *126# to the school MTN number', createdAt: '2026-10-25T14:35:00Z',
   }];
+  const notifications = [{
+    id: 'nt1', roles: ['bursar', 'superadmin'], userIds: [], kind: 'verify', readBy: [],
+    title: `Payment to verify: 5,000 XAF from ${parentGuardian.name}`,
+    body: `For ${firstChild.firstName} ${firstChild.lastName} · MTN Mobile Money · MP261025.1432.B77120`,
+    link: '/fees/online', createdAt: '2026-10-25T14:35:00Z',
+  }];
 
   const activityLog = [
     { id: 'lg1', userId: 'u3', action: 'Recorded payment', details: 'Opening balances imported', at: '2026-10-24T16:10:00Z' },
@@ -474,6 +480,6 @@ export async function buildSeed() {
     staff, salaryScales, salaryAdjustments, payrollRuns,
     inventory: inv, stockMovements, sales,
     academicRecords, promotionRecommendations: [],
-    announcements, users, activityLog, paymentRequests,
+    announcements, users, activityLog, paymentRequests, notifications,
   };
 }

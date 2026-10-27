@@ -15,6 +15,7 @@ export function migrate(data) {
   data.paymentRequests ||= [];
   data.settings.momo ||= { ...DEFAULT_MOMO };
   data.settings.counters.request ||= 0;
+  data.notifications ||= [];
   return data;
 }
 
@@ -40,15 +41,35 @@ export function StoreProvider({ children }) {
     if (!db) buildSeed().then(setDb);
   }, [db]);
 
+  // Last JSON written or received, so a change synced in from another tab is not written straight back.
+  const lastSaved = useRef(null);
+
   useEffect(() => {
     if (!db) return;
     try {
-      localStorage.setItem(KEY, JSON.stringify(db));
+      const json = JSON.stringify(db);
+      if (json === lastSaved.current) return;
+      localStorage.setItem(KEY, json);
+      lastSaved.current = json;
       setSaveError('');
     } catch {
       setSaveError('Storage is full — remove large uploaded documents or photos so changes can be saved.');
     }
   }, [db]);
+
+  // Live updates: when another tab or window of this browser saves (e.g. a parent pays while
+  // the bursar has the app open), pick up the change immediately.
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key !== KEY || !e.newValue || e.newValue === lastSaved.current) return;
+      try {
+        lastSaved.current = e.newValue;
+        setDb(migrate(JSON.parse(e.newValue)));
+      } catch { /* ignore malformed writes */ }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const user = db && userId ? db.users.find((u) => u.id === userId && u.active) : null;
 
@@ -79,6 +100,22 @@ export function StoreProvider({ children }) {
     },
     remove(coll, id) {
       mutate((d) => { d[coll] = d[coll].filter((x) => x.id !== id); return d; });
+    },
+    /** In-app notification for everyone in `roles` and/or specific `userIds`. */
+    notify({ roles = [], userIds = [], title, body = '', link = '', kind = 'info' }) {
+      const n = { id: uid('nt'), roles, userIds, title, body, link, kind, createdAt: new Date().toISOString(), readBy: [] };
+      mutate((d) => {
+        d.notifications.unshift(n);
+        d.notifications = d.notifications.slice(0, 500);
+        return d;
+      });
+      return n;
+    },
+    markRead(ids, readerId) {
+      mutate((d) => {
+        d.notifications.forEach((n) => { if (ids.includes(n.id) && !n.readBy.includes(readerId)) n.readBy.push(readerId); });
+        return d;
+      });
     },
     setSchool(patch) {
       mutate((d) => { d.school = { ...d.school, ...patch }; return d; });

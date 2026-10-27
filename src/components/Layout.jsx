@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import {
-  AlertTriangle, BarChart3, Bell, BookOpenCheck, Building2, ClipboardList, GraduationCap, LayoutDashboard, LogOut,
+  AlertTriangle, BarChart3, BookOpenCheck, Building2, ClipboardList, GraduationCap, LayoutDashboard, LogOut,
   Megaphone, Menu, Smartphone, Package, Receipt, Settings2, ShieldCheck, Users, UserRound, Wallet, X, ArrowUpCircle, Home, Contact,
 } from 'lucide-react';
 import { useStore } from '../lib/store';
@@ -9,6 +9,7 @@ import { can } from '../lib/permissions';
 import { currentTerm } from '../lib/finance';
 import { ROLES } from '../lib/utils';
 import { Avatar } from './ui';
+import NotificationBell from './NotificationBell';
 
 export function Logo({ school, size = 'md' }) {
   const s = size === 'lg' ? 'size-16' : 'size-10';
@@ -62,9 +63,7 @@ export const allowed = (user, perm) => (perm === 'users' ? user.role === 'supera
 export default function Layout() {
   const { db, user, logout, saveError } = useStore();
   const [open, setOpen] = useState(false);
-  const loc = useLocation();
   const term = currentTerm(db);
-  const unreadish = db.announcements.filter((a) => a.audience === 'all' || (user.role === 'parent' ? a.audience === 'parents' : a.audience === 'staff')).length;
 
   const sidebar = (
     <nav className="flex h-full flex-col bg-brand-950 text-brand-100">
@@ -130,10 +129,7 @@ export default function Layout() {
             <p className="truncate text-xs text-slate-500">Academic session</p>
             <p className="truncate text-sm font-bold text-slate-800">{term?.label}</p>
           </div>
-          <NavLink to={user.role === 'parent' ? '/portal/news' : '/announcements'} className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Announcements" state={{ from: loc.pathname }}>
-            <Bell className="size-5" />
-            {unreadish > 0 && <span className="absolute top-1 right-1 size-2 rounded-full bg-accent-500" />}
-          </NavLink>
+          <NotificationBell />
           <div className="flex items-center gap-2.5">
             <Avatar name={user.name} size="sm" />
             <div className="hidden min-w-0 sm:block">

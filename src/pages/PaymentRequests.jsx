@@ -32,6 +32,11 @@ export default function PaymentRequests() {
       note: `Submitted by ${guardianName(approve.request.guardianId)} via parent portal`,
     }));
     api.update('paymentRequests', approve.request.id, { status: 'approved', reviewedBy: user.id, reviewedAt: new Date().toISOString(), paymentIds: created.map((p) => p.id), approvedAmount: sum(items, (i) => i.amount), reviewNote: approve.note });
+    api.notify({
+      userIds: [approve.request.userId], kind: 'confirmed', link: '/portal/payments',
+      title: `Payment confirmed: ${money(sum(items, (i) => i.amount), cur)}`,
+      body: `Your ${methodLabel(approve.request.method)} payment ${approve.request.reference} was verified. Receipts: ${created.map((p) => p.receiptNo).join(', ')}`,
+    });
     api.log('Verified parent payment', `${approve.request.ref} — ${money(sum(items, (i) => i.amount), cur)} (${approve.request.reference})`);
     notify(`Confirmed. ${created.length} receipt(s) issued: ${created.map((p) => p.receiptNo).join(', ')}`);
     setApprove(null);
@@ -40,6 +45,11 @@ export default function PaymentRequests() {
   const doReject = () => {
     if (!reject.reason.trim()) return notify('Tell the parent why, so they can fix it.');
     api.update('paymentRequests', reject.request.id, { status: 'rejected', reviewedBy: user.id, reviewedAt: new Date().toISOString(), reviewNote: reject.reason.trim() });
+    api.notify({
+      userIds: [reject.request.userId], kind: 'rejected', link: '/portal/payments?tab=requests',
+      title: `Payment not accepted: ${money(reject.request.amount, cur)}`,
+      body: `${reject.request.reference} — ${reject.reason.trim()}`,
+    });
     api.log('Rejected parent payment', `${reject.request.ref} — ${reject.reason.trim()}`);
     notify('Rejected. The parent sees your reason in their portal.');
     setReject(null);

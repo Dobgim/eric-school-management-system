@@ -10,6 +10,8 @@ import { fmtDate, fullName, methodLabel, money, readFileAsDataURL, sum, today, u
 import { Avatar, Badge, Button, Card, Empty, Field, Input, PageHeader, Select, Textarea } from '../components/ui';
 import { myChildren } from './Portal';
 
+const childNames = (db, items) => items.map((i) => { const s = db.students.find((x) => x.id === i.studentId); return `${s.firstName} ${s.lastName} (${money(i.amount, db.school.currency)})`; }).join(', ');
+
 export default function PayFees() {
   const { db, user } = useStore();
   const [params] = useSearchParams();
@@ -134,6 +136,11 @@ function PromptPay({ items, total, defaultPhone, onDone }) {
       createdAt: new Date().toISOString(), reviewedAt: new Date().toISOString(), paymentIds: payments.map((p) => p.id),
     });
     api.log('Paid fees online', `${user.name} — ${money(total, cur)} via ${OPERATORS[operator].label} (${res.transactionId})`);
+    api.notify({
+      roles: ['bursar', 'superadmin'], kind: 'payment', link: '/fees',
+      title: `${money(total, cur)} paid online by ${user.name}`,
+      body: `${childNames(db, items)} · ${OPERATORS[operator].label} · ${res.transactionId} · receipts ${payments.map((p) => p.receiptNo).join(', ')}`,
+    });
     onDone({ kind: 'online', payments, transactionId: res.transactionId, total, operator });
   };
 
@@ -205,6 +212,11 @@ function ManualPay({ items, total, defaultPhone, onDone }) {
     };
     api.add('paymentRequests', request);
     api.log('Submitted payment for verification', `${user.name} — ${money(total, cur)} via ${methodLabel(f.method)} (${request.reference})`);
+    api.notify({
+      roles: ['bursar', 'superadmin'], kind: 'verify', link: '/fees/online',
+      title: `Payment to verify: ${money(total, cur)} from ${user.name}`,
+      body: `${childNames(db, items)} · ${methodLabel(f.method)} · ${request.reference}`,
+    });
     onDone({ kind: 'manual', request });
   };
 
