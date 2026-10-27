@@ -38,7 +38,25 @@ The login screen also lists these; click one to fill in the form.
 | Uniforms, books and materials: stock in and out, sales linked to pupils, low-stock alerts, valuation | Uniforms & Materials |
 | Dashboard plus 9 reports (daily and termly collection, debtors, salary, uniform sales, enrolment, gender, class list, class results), exportable to PDF and Excel | Dashboard, Reports |
 | Role-based menus and routes, user management, activity log of every change | Users & Activity |
-| Parents portal: children's profiles, fees, receipts, purchases, results, announcements, calendar | log in as a parent |
+| Parent dashboard: family totals, a card per child (fee progress, latest result), recent payments, announcements, upcoming events | log in as a parent |
+| Parents pay fees online for one or several children (see below), download receipts and a payment statement | Pay Fees, Payments & Receipts |
+| Bursar checks the payments parents submit, then confirms them (receipts issued) or rejects them with a reason | Parent Payments |
+
+## Parent payments
+
+Parents have two ways to pay from the portal:
+
+1. **Pay now (MTN MoMo / Orange Money):** the parent enters their number and approves the prompt on their phone. The payment is recorded and the receipt is ready straight away.
+2. **"I've already paid":** the parent pays the school's MoMo number (`*126#` / `#150#`) or bank account, then submits the transaction ID and an optional screenshot. The bursar checks it against the school's statement under **Parent Payments** and confirms or rejects it.
+
+Each payment clears the pupil's oldest unpaid term first. A transaction ID can't be used twice. The school's MoMo numbers and bank account are set under School Profile → System Settings.
+
+**"Pay now" runs in demo mode.** No money moves; the phone prompt is simulated, and a number ending in `000` simulates a declined payment. Taking real money needs two things:
+
+- a merchant account with a Cameroon payment provider (for example Campay, Notch Pay or Monetbil, or MTN MoMo / Orange Money directly);
+- a small server that holds the provider's API keys and receives its payment confirmations (webhooks).
+
+Then replace `requestCollection()` in [src/lib/momo.js](src/lib/momo.js) with a call to that server. Never put API keys in the frontend.
 
 ## Where the data lives
 

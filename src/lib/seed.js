@@ -17,6 +17,18 @@ const QUARTERS = ['Molyko', 'Bonduma', 'Mile 16', 'Mile 17', 'Bokwai', 'Great So
 
 export const PREFIX = 'BFS';
 
+// School collection accounts shown to parents who pay by USSD or bank transfer.
+export const DEFAULT_MOMO = {
+  gateway: 'demo',
+  mtnNumber: '677 12 34 56',
+  mtnName: 'BRIGHT FUTURE SCHOOL',
+  orangeNumber: '699 65 43 21',
+  orangeName: 'BRIGHT FUTURE SCHOOL',
+  bankName: 'Afriland First Bank, Buea',
+  bankAccount: '10005 00012 01234567890 42',
+  bankAccountName: 'Bright Future Nursery & Primary School',
+};
+
 export async function buildSeed() {
   const r = rng(237);
   const pick = (a) => a[Math.floor(r() * a.length)];
@@ -318,7 +330,8 @@ export async function buildSeed() {
     lowStockDefault: 10,
     currentSessionId: 's2627',
     currentTermId: 's2627-t1',
-    counters: { reg: regSeq, receipt: receiptSeq, staff: staff.length, sale: 0 },
+    counters: { reg: regSeq, receipt: receiptSeq, staff: staff.length, sale: 0, request: 1 },
+    momo: { ...DEFAULT_MOMO },
   };
   const payrollRuns = [];
   const runFor = (month, status, paidRatio = 1) => {
@@ -438,6 +451,16 @@ export async function buildSeed() {
     delete u.pw;
   }
 
+  // One parent submission waiting for the bursar, so the verification queue is not empty.
+  const firstChild = students.find((s) => s.guardianIds.includes(parentGuardian.id) && s.status === 'active');
+  const paymentRequests = [{
+    id: 'rq1', ref: 'PAY-00001', channel: 'manual', status: 'pending', method: 'mtn',
+    guardianId: parentGuardian.id, userId: 'u5', payerPhone: parentGuardian.phone,
+    reference: 'MP261025.1432.B77120', paidOn: '2026-10-25', proof: '',
+    items: [{ studentId: firstChild.id, amount: 5000 }], amount: 5000,
+    note: 'Paid through *126# to the school MTN number', createdAt: '2026-10-25T14:35:00Z',
+  }];
+
   const activityLog = [
     { id: 'lg1', userId: 'u3', action: 'Recorded payment', details: 'Opening balances imported', at: '2026-10-24T16:10:00Z' },
     { id: 'lg2', userId: 'u1', action: 'Approved payroll', details: 'October 2026', at: '2026-10-24T09:30:00Z' },
@@ -451,6 +474,6 @@ export async function buildSeed() {
     staff, salaryScales, salaryAdjustments, payrollRuns,
     inventory: inv, stockMovements, sales,
     academicRecords, promotionRecommendations: [],
-    announcements, users, activityLog,
+    announcements, users, activityLog, paymentRequests,
   };
 }

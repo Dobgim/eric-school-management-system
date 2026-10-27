@@ -23,7 +23,9 @@ export function downloadReceipt(db, payment) {
     term: term.label,
     lines: allocated,
     status: { ...status, billed, paid: paidToDate, balance: Math.max(0, billed - paidToDate) },
-    receivedBy: db.users.find((u) => u.id === payment.receivedBy)?.name || 'Bursar',
+    receivedBy: payment.channel === 'online'
+      ? 'Online payment (parent portal)'
+      : db.users.find((u) => u.id === payment.receivedBy)?.name || 'Bursar',
   });
 }
 

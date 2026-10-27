@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   AlertTriangle, BarChart3, Bell, BookOpenCheck, Building2, ClipboardList, GraduationCap, LayoutDashboard, LogOut,
-  Megaphone, Menu, Package, Receipt, Settings2, ShieldCheck, Users, UserRound, Wallet, X, ArrowUpCircle, Home, Contact,
+  Megaphone, Menu, Smartphone, Package, Receipt, Settings2, ShieldCheck, Users, UserRound, Wallet, X, ArrowUpCircle, Home, Contact,
 } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { can } from '../lib/permissions';
@@ -26,7 +26,13 @@ const NAV = [
   { group: 'Overview', items: [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard, perm: 'dashboard', end: true },
     { to: '/my-class', label: 'My Class', icon: GraduationCap, perm: 'myclass' },
-    { to: '/portal', label: 'My Children', icon: Home, perm: 'portal', end: true },
+    { to: '/portal', label: 'Dashboard', icon: Home, perm: 'portal', end: true },
+  ] },
+  { group: 'My family', items: [
+    { to: '/portal/children', label: 'My Children', icon: Users, perm: 'portal' },
+    { to: '/portal/pay', label: 'Pay Fees', icon: Smartphone, perm: 'portal' },
+    { to: '/portal/payments', label: 'Payments & Receipts', icon: Receipt, perm: 'portal' },
+    { to: '/portal/news', label: 'News & Calendar', icon: Megaphone, perm: 'portal' },
   ] },
   { group: 'Academics', items: [
     { to: '/students', label: 'Students', icon: Users, perm: 'students.view' },
@@ -36,6 +42,7 @@ const NAV = [
   ] },
   { group: 'Finance', items: [
     { to: '/fees', label: 'Fee Collection', icon: Receipt, perm: 'fees.view', end: true },
+    { to: '/fees/online', label: 'Parent Payments', icon: Smartphone, perm: 'fees.collect', badge: (db) => db.paymentRequests.filter((r) => r.status === 'pending').length },
     { to: '/fees/debtors', label: 'Debtors', icon: AlertTriangle, perm: 'fees.view' },
     { to: '/fees/structure', label: 'Fee Structure', icon: ClipboardList, perm: 'fees.setup' },
     { to: '/payroll', label: 'Payroll', icon: Wallet, perm: 'payroll' },
@@ -85,7 +92,8 @@ export default function Layout() {
                     `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${isActive ? 'bg-white/10 text-white' : 'text-brand-200 hover:bg-white/5 hover:text-white'}`}
                 >
                   <i.icon className="size-4.5 shrink-0" />
-                  {i.label}
+                  <span className="flex-1">{i.label}</span>
+                  {i.badge?.(db) > 0 && <span className="rounded-full bg-accent-400 px-1.5 text-xs font-bold text-slate-900">{i.badge(db)}</span>}
                 </NavLink>
               ))}
             </div>
@@ -122,7 +130,7 @@ export default function Layout() {
             <p className="truncate text-xs text-slate-500">Academic session</p>
             <p className="truncate text-sm font-bold text-slate-800">{term?.label}</p>
           </div>
-          <NavLink to={user.role === 'parent' ? '/portal?tab=news' : '/announcements'} className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Announcements" state={{ from: loc.pathname }}>
+          <NavLink to={user.role === 'parent' ? '/portal/news' : '/announcements'} className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Announcements" state={{ from: loc.pathname }}>
             <Bell className="size-5" />
             {unreadish > 0 && <span className="absolute top-1 right-1 size-2 rounded-full bg-accent-500" />}
           </NavLink>

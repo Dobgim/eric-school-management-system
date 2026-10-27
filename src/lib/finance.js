@@ -92,3 +92,27 @@ export function computePayrollItem(db, staff, month) {
     method: staff.bankName === 'MTN Mobile Money' ? 'mtn' : staff.bankName === 'Orange Money' ? 'orange' : staff.accountNo ? 'bank' : 'cash',
   };
 }
+
+/** Split an amount across the oldest unpaid terms first; any surplus is credited to the current term. */
+export function allocateToTerms(db, student, amount) {
+  const current = termById(db, db.settings.currentTermId);
+  const out = [];
+  let left = Math.round(Number(amount) || 0);
+  for (const t of termsUpTo(db, current.id)) {
+    const due = termBill(db, student, t.id) - termPaid(db, student.id, t.id);
+    if (due <= 0 || left <= 0) continue;
+    const take = Math.min(due, left);
+    out.push({ termId: t.id, sessionId: t.sessionId, amount: take });
+    left -= take;
+  }
+  if (left > 0) {
+    const cur = out.find((x) => x.termId === current.id);
+    if (cur) cur.amount += left;
+    else out.push({ termId: current.id, sessionId: current.sessionId, amount: left });
+  }
+  return out;
+}
+
+/** Amount already submitted by a parent but not yet verified, per pupil. */
+export const pendingFor = (db, studentId) =>
+  sum((db.paymentRequests || []).filter((r) => r.status === 'pending').flatMap((r) => r.items).filter((i) => i.studentId === studentId), (i) => i.amount);

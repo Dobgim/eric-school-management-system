@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Building2, CalendarDays, Layers, Pencil, Plus, Save, Settings2, Trash2, Upload, Warehouse } from 'lucide-react';
-import { useStore } from '../lib/store';
+import { migrate, useStore } from '../lib/store';
 import { can } from '../lib/permissions';
 import { allTerms, currentTerm } from '../lib/finance';
 import { fmtDate, readFileAsDataURL, today } from '../lib/utils';
@@ -9,7 +10,8 @@ import { Badge, Button, Card, Confirm, DataTable, Field, Info, Input, Modal, Pag
 
 export default function SchoolProfile() {
   const { db, user } = useStore();
-  const [tab, setTab] = useState('profile');
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState(params.get('tab') || 'profile');
   const edit = can(user, 'school.edit');
   const tabs = [
     { id: 'profile', label: 'Profile', icon: Building2 },
@@ -26,7 +28,7 @@ export default function SchoolProfile() {
       {tab === 'classes' && <ClassesTab edit={edit} />}
       {tab === 'facilities' && <FacilitiesTab edit={edit} />}
       {tab === 'calendar' && <CalendarTab edit={edit || can(user, 'calendar.edit')} />}
-      {tab === 'settings' && <SettingsTab />}
+      {tab === 'settings' && user.role === 'superadmin' && <SettingsTab />}
     </>
   );
 }
@@ -344,6 +346,8 @@ function SettingsTab() {
   const [cnps, setCnps] = useState(db.settings.cnpsRate);
   const [prefix, setPrefix] = useState(db.school.regPrefix);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [momo, setMomo] = useState(db.settings.momo);
+  const setMomoField = (k) => (e) => setMomo({ ...momo, [k]: e.target.value });
   const [toast, notify] = useToast();
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -354,6 +358,22 @@ function SettingsTab() {
           <Field label="CNPS employee contribution (%)" hint="Deducted from basic salary on each payroll run. Set 0 to disable."><Input type="number" step="0.1" min="0" value={cnps} onChange={(e) => setCnps(e.target.value)} /></Field>
           <Button icon={Save} onClick={() => { api.setSettings({ cnpsRate: Number(cnps) }); api.setSchool({ regPrefix: prefix }); api.log('Updated system settings'); notify('Settings saved.'); }}>Save settings</Button>
         </div>
+      </Card>
+      <Card title="Parent payment accounts" className="lg:row-span-2">
+        <p className="mb-4 text-sm text-slate-600">Shown to parents on the Pay Fees page when they pay by USSD or bank transfer and submit the transaction ID.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="MTN MoMo number"><Input value={momo.mtnNumber} onChange={setMomoField('mtnNumber')} /></Field>
+          <Field label="MTN account name"><Input value={momo.mtnName} onChange={setMomoField('mtnName')} /></Field>
+          <Field label="Orange Money number"><Input value={momo.orangeNumber} onChange={setMomoField('orangeNumber')} /></Field>
+          <Field label="Orange account name"><Input value={momo.orangeName} onChange={setMomoField('orangeName')} /></Field>
+          <Field label="Bank"><Input value={momo.bankName} onChange={setMomoField('bankName')} /></Field>
+          <Field label="Account number"><Input value={momo.bankAccount} onChange={setMomoField('bankAccount')} /></Field>
+          <Field label="Account name" className="sm:col-span-2"><Input value={momo.bankAccountName} onChange={setMomoField('bankAccountName')} /></Field>
+        </div>
+        <div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
+          <b>“Pay now” phone prompts run in demo mode</b> — no money moves. To take real MoMo payments, open a merchant account with a payment provider (e.g. Campay, Notch Pay, Monetbil, or MTN/Orange directly) and connect it through a small server; see <code>src/lib/momo.js</code>.
+        </div>
+        <Button className="mt-4" icon={Save} onClick={() => { api.setSettings({ momo }); api.log('Updated parent payment accounts'); notify('Payment accounts saved.'); }}>Save accounts</Button>
       </Card>
       <Card title="Data">
         <dl className="grid grid-cols-2 gap-4">
@@ -379,6 +399,7 @@ function SettingsTab() {
               try {
                 const data = JSON.parse(await f.text());
                 if (!data.students || !data.users) throw new Error();
+                migrate(data);
                 api.mutate(() => data);
                 notify('Backup restored.');
               } catch { notify('That file is not a valid backup.'); }

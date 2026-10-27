@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { buildSeed } from './seed';
+import { DEFAULT_MOMO, buildSeed } from './seed';
 import { hashPassword, uid } from './utils';
 
 // All data lives in one JSON document. Swapping this module for an API client is the
@@ -9,10 +9,19 @@ const SESSION_KEY = 'sis:session:v1';
 
 const StoreContext = createContext(null);
 
+// Bring data saved by an older version up to the current shape.
+export function migrate(data) {
+  if (!data) return data;
+  data.paymentRequests ||= [];
+  data.settings.momo ||= { ...DEFAULT_MOMO };
+  data.settings.counters.request ||= 0;
+  return data;
+}
+
 function load() {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? JSON.parse(raw) : null;
+    return raw ? migrate(JSON.parse(raw)) : null;
   } catch {
     return null;
   }

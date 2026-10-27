@@ -19,6 +19,7 @@ export default function Fees() {
   const payFor = params.get('student');
   const [open, setOpen] = useState(!!payFor);
   const cur = db.school.currency;
+  const pendingRequests = db.paymentRequests.filter((r) => r.status === 'pending');
 
   const rows = useMemo(() => {
     const needle = filters.q.trim().toLowerCase();
@@ -58,6 +59,12 @@ export default function Fees() {
         subtitle="Record school fees paid in cash, MTN Mobile Money, Orange Money or by bank transfer."
         actions={can(user, 'fees.collect') && <Button icon={Plus} onClick={() => setOpen(true)}>Record payment</Button>}
       />
+      {pendingRequests.length > 0 && can(user, 'fees.collect') && (
+        <Link to="/fees/online" className="mb-6 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900 hover:bg-amber-100">
+          <span><b>{pendingRequests.length} parent payment(s)</b> ({money(sum(pendingRequests, (r) => r.amount), cur)}) waiting for you to verify.</span>
+          <span className="font-semibold">Review now →</span>
+        </Link>
+      )}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Collected today" value={money(sum(todays, (p) => p.amount), cur)} icon={Banknote} tone="green" hint={`${todays.length} payment(s)`} />
         <StatCard label={`Collected · ${term.name}`} value={money(termTotal, cur)} icon={Banknote} />
@@ -89,7 +96,7 @@ export default function Fees() {
             { key: 'date', label: 'Date', render: (p) => fmtDate(p.date) },
             { key: 'student', label: 'Pupil', render: (p) => <Link to={`/students/${p.studentId}`} className="font-semibold text-slate-800 hover:text-brand-700">{fullName(p.student)}</Link> },
             { key: 'term', label: 'Term', render: (p) => allTerms(db).find((t) => t.id === p.termId)?.label },
-            { key: 'method', label: 'Method', render: (p) => <div><Badge tone={p.method === 'mtn' ? 'amber' : p.method === 'orange' ? 'red' : p.method === 'bank' ? 'blue' : 'green'}>{methodLabel(p.method)}</Badge>{p.reference && <p className="mt-0.5 font-mono text-xs text-slate-500">{p.reference}</p>}</div> },
+            { key: 'method', label: 'Method', render: (p) => <div><Badge tone={p.method === 'mtn' ? 'amber' : p.method === 'orange' ? 'red' : p.method === 'bank' ? 'blue' : 'green'}>{methodLabel(p.method)}</Badge>{p.channel === 'online' && <Badge tone='blue' className='ml-1'>Online</Badge>}{p.channel === 'portal' && <Badge className='ml-1'>Via portal</Badge>}{p.reference && <p className="mt-0.5 font-mono text-xs text-slate-500">{p.reference}</p>}</div> },
             { key: 'amount', label: 'Amount', align: 'right', render: (p) => <span className="font-semibold">{money(p.amount, '')}</span> },
             { key: 'a', label: '', align: 'right', render: (p) => (
               <div className="flex justify-end gap-1">

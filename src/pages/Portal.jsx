@@ -1,42 +1,38 @@
-import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { CalendarDays, Download, Megaphone, Phone, ShoppingBag, Wallet } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Download, GraduationCap, ShoppingBag, Smartphone, Wallet } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { allTerms, billLines, currentTerm, feeStatus, termPaid, termsUpTo } from '../lib/finance';
+import { allTerms, billLines, feeStatus, termPaid, termsUpTo } from '../lib/finance';
 import { downloadReceipt } from '../lib/documents';
 import { age, feeTypeLabel, fmtDate, fullName, methodLabel, money, today } from '../lib/utils';
 import { Avatar, Badge, Button, Card, DataTable, Empty, FeeBadge, Info, PageHeader, Tabs } from '../components/ui';
 import { Progress } from '../components/Charts';
-import { AnnouncementList, visibleAnnouncements } from './Announcements';
 
+export const myChildren = (db, user) =>
+  db.students.filter((s) => s.guardianIds.includes(user.guardianId)).sort((a, b) => (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1));
+
+/** "My Children": one child at a time, with profile, fees, purchases and results tabs. */
 export default function Portal() {
   const { db, user } = useStore();
   const [params, setParams] = useSearchParams();
-  const kids = db.students.filter((s) => s.guardianIds.includes(user.guardianId)).sort((a, b) => (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1));
-  const [childId, setChildId] = useState(kids[0]?.id);
+  const kids = myChildren(db, user);
+  const childId = kids.some((k) => k.id === params.get('child')) ? params.get('child') : kids[0]?.id;
   const tab = params.get('tab') || 'overview';
-  const setTab = (t) => setParams(t === 'overview' ? {} : { tab: t }, { replace: true });
+  const setParam = (k, v) => { const p = new URLSearchParams(params); p.set(k, v); setParams(p, { replace: true }); };
+  const setTab = (t) => setParam('tab', t);
   const child = kids.find((k) => k.id === childId);
-  const term = currentTerm(db);
-  const cur = db.school.currency;
-  const familyDue = kids.filter((k) => k.status === 'active').reduce((t, k) => t + feeStatus(db, k).totalDue, 0);
+  const owing = child && child.status === 'active' ? feeStatus(db, child).totalDue : 0;
 
   return (
     <>
-      <PageHeader title={`Hello, ${user.name}`} subtitle={`${term.label} · ${kids.length} child${kids.length === 1 ? '' : 'ren'} at ${db.school.name}`} />
-      {familyDue > 0 && (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
-          <div>
-            <p className="font-bold text-amber-900">Outstanding fees: {money(familyDue, cur)}</p>
-            <p className="text-sm text-amber-800">Pay at the bursary, by MTN MoMo or Orange Money to {db.school.phone}, or by bank transfer. Always collect your receipt.</p>
-          </div>
-          <a href={`tel:${db.school.phone.replace(/\s/g, '')}`} className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-amber-600"><Phone className="size-4" />Call bursary</a>
-        </div>
-      )}
+      <PageHeader
+        title="My Children"
+        subtitle={`${kids.length} child${kids.length === 1 ? '' : 'ren'} at ${db.school.name}`}
+        actions={owing > 0 && <Link to={`/portal/pay?child=${child.id}`}><Button icon={Smartphone}>Pay {money(owing, db.school.currency)} for {child.firstName}</Button></Link>}
+      />
       {kids.length > 1 && (
         <div className="mb-6 flex gap-3 overflow-x-auto pb-1">
           {kids.map((k) => (
-            <button key={k.id} onClick={() => setChildId(k.id)} className={`flex shrink-0 items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${k.id === childId ? 'border-brand-600 bg-white shadow-sm ring-2 ring-brand-600/15' : 'border-slate-200 bg-white/60 hover:bg-white'}`}>
+            <button key={k.id} onClick={() => setParam('child', k.id)} className={`flex shrink-0 items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${k.id === childId ? 'border-brand-600 bg-white shadow-sm ring-2 ring-brand-600/15' : 'border-slate-200 bg-white/60 hover:bg-white'}`}>
               <Avatar name={`${k.firstName} ${k.lastName}`} src={k.photo} size="sm" />
               <div><p className="text-sm font-bold text-slate-800">{k.firstName} {k.lastName}</p><p className="text-xs text-slate-500">{db.classes.find((c) => c.id === k.classId)?.name}{k.status !== 'active' ? ` · ${k.status}` : ''}</p></div>
             </button>
@@ -45,13 +41,11 @@ export default function Portal() {
       )}
       {!child ? <Empty title="No children linked to your account" message="Contact the school office." /> : (
         <>
-          <Tabs tabs={[{ id: 'overview', label: 'Profile' }, { id: 'fees', label: 'Fees & receipts', icon: Wallet }, { id: 'purchases', label: 'Uniforms & materials', icon: ShoppingBag }, { id: 'results', label: 'Results' }, { id: 'news', label: 'Announcements', icon: Megaphone }, { id: 'calendar', label: 'Calendar', icon: CalendarDays }]} value={tab} onChange={setTab} />
+          <Tabs tabs={[{ id: 'overview', label: 'Profile' }, { id: 'fees', label: 'Fees & receipts', icon: Wallet }, { id: 'purchases', label: 'Uniforms & materials', icon: ShoppingBag }, { id: 'results', label: 'Results', icon: GraduationCap }]} value={tab} onChange={setTab} />
           {tab === 'overview' && <Overview child={child} />}
           {tab === 'fees' && <Fees child={child} />}
           {tab === 'purchases' && <Purchases child={child} />}
           {tab === 'results' && <Results child={child} />}
-          {tab === 'news' && <div className="max-w-3xl"><AnnouncementList items={visibleAnnouncements(db, user)} /></div>}
-          {tab === 'calendar' && <Calendar />}
         </>
       )}
     </>
@@ -180,7 +174,7 @@ function Results({ child }) {
   );
 }
 
-function Calendar() {
+export function Calendar() {
   const { db } = useStore();
   const events = [...db.calendarEvents].sort((a, b) => a.date.localeCompare(b.date));
   return (

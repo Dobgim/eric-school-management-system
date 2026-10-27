@@ -22,6 +22,10 @@ import Announcements from './pages/Announcements';
 import Users from './pages/Users';
 import MyClass from './pages/MyClass';
 import Portal from './pages/Portal';
+import ParentDashboard from './pages/ParentDashboard';
+import PayFees from './pages/PayFees';
+import ParentPayments, { ParentNews } from './pages/ParentPayments';
+import PaymentRequests from './pages/PaymentRequests';
 import Account from './pages/Account';
 
 function Guard({ perm, children }) {
@@ -54,6 +58,7 @@ export default function App() {
         <Route path="academics" element={g('academics.edit', <Academics />)} />
         <Route path="promotion" element={g('promotion', <Promotion />)} />
         <Route path="fees" element={g('fees.view', <Fees />)} />
+        <Route path="fees/online" element={g('fees.collect', <PaymentRequests />)} />
         <Route path="fees/debtors" element={g('fees.view', <Debtors />)} />
         <Route path="fees/structure" element={g('fees.setup', <FeeStructure />)} />
         <Route path="staff" element={g('staff.view', <Staff />)} />
@@ -63,7 +68,11 @@ export default function App() {
         <Route path="announcements" element={<Announcements />} />
         <Route path="users" element={g('users', <Users />)} />
         <Route path="my-class" element={g('myclass', <MyClass />)} />
-        <Route path="portal" element={g('portal', <Portal />)} />
+        <Route path="portal" element={g('portal', <ParentDashboard />)} />
+        <Route path="portal/children" element={g('portal', <Portal />)} />
+        <Route path="portal/pay" element={g('portal', <PayFees />)} />
+        <Route path="portal/payments" element={g('portal', <ParentPayments />)} />
+        <Route path="portal/news" element={g('portal', <ParentNews />)} />
         <Route path="account" element={<Account />} />
         <Route path="*" element={<Navigate to={homePath(user)} replace />} />
       </Route>
