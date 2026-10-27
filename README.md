@@ -184,20 +184,40 @@ Phones can only install it when it's served over **HTTPS**, i.e. once deployed.
 
 ## Deploy
 
-The app is one Node service (API and web app together) plus a PostgreSQL database. On [Render](https://render.com):
+The app needs its **API running** and a **PostgreSQL database**. Hosting only the web pages is not enough: every `/api/...` call then returns 404.
 
-1. Create a free PostgreSQL database (on Render, Neon or Supabase) and copy its connection string.
-2. On Render, choose **New → Blueprint**, pick this GitHub repo, and [render.yaml](render.yaml) configures the service.
-3. Paste the `DATABASE_URL` when asked. `JWT_SECRET` is generated for you. Also set `ADMIN_PASSWORD` for the first admin login.
-4. Open the URL Render gives you, sign in as `admin`, and change the password.
+### Vercel
 
-Any Node host works: build with `npm ci && npm run build`, then start with `npm start`, with `DATABASE_URL` and `JWT_SECRET` set. Static-only hosts (plain Vercel or Netlify) are not enough, because the API must run.
+[vercel.json](vercel.json) and [api/index.js](api/index.js) run the API as a serverless function next to the web app.
+
+1. Import the GitHub repo in Vercel. It detects Vite; keep the defaults.
+2. Add the database:
+   - Go to **Storage → Create Database → Neon (Postgres)** and connect it to the project. This sets `DATABASE_URL` for you.
+   - Alternatively, paste a connection string from Neon or Supabase under **Settings → Environment Variables** as `DATABASE_URL`. Prefer the *pooled* connection string.
+3. Under **Settings → Environment Variables**, also add:
+   - `JWT_SECRET`: any long random string;
+   - `ADMIN_PASSWORD` (optional): used for the first `admin` account.
+4. **Redeploy.** The first request creates the tables and the clean starting data. Sign in as `admin` and change the password.
+
+Without `DATABASE_URL`, the sign-in page shows *“The school database is not connected yet…”* instead of failing.
+
+On Vercel, the API can't hold a live connection open, so instead of instant updates each device checks for changes every 10 seconds and whenever the app comes back into view. Notifications still arrive, a few seconds later.
+
+### Render (or any Node host)
+
+The whole app runs as one always-on Node service, with instant live updates.
+
+1. On Render, choose **New → Blueprint** and pick this repo. [render.yaml](render.yaml) configures the service.
+2. Paste the `DATABASE_URL` when asked. `JWT_SECRET` is generated for you.
+
+On any other Node host: build with `npm ci && npm run build`, then start with `npm start`, with `DATABASE_URL` and `JWT_SECRET` set.
 
 ## Project layout
 
 ```
 server/
-  index.js     Express app: auth, data API, online payments, live events, serves dist/
+  app.js       Express app: auth, data API, online payments, live events
+  index.js     starts app.js locally (and serves dist/ in production)
   data.js      what each role may see and change
   db.js        PostgreSQL (DATABASE_URL) or local PGlite
   auth.js      password hashing, session cookie
@@ -209,5 +229,6 @@ src/
   lib/         API-backed store, finance maths, PDF/Excel exporters, permissions, PWA
   components/  layout shell, UI kit, charts, notifications, install prompts
   pages/       one file per module
+api/index.js   Vercel serverless entry (wraps server/app.js)
 public/        manifest, service worker, icons
 ```

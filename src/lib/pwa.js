@@ -44,9 +44,12 @@ export function initPwa() {
       document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && reg.update());
     } catch { /* offline first load or unsupported — the app still works as a website */ }
   });
+  // Reload only when a NEW version replaces an old one (after "Update now"). On a first visit the worker
+  // simply takes control; reloading then would wipe whatever the person was typing.
+  const hadController = !!navigator.serviceWorker.controller;
   let reloaded = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (reloaded) return;
+    if (!hadController || reloaded) return;
     reloaded = true;
     window.location.reload();
   });

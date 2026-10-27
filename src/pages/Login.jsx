@@ -8,7 +8,7 @@ import { Button, Field, Input } from '../components/ui';
 import { InstallButton } from '../components/InstallApp';
 
 export default function Login() {
-  const { school, login } = useStore();
+  const { school, login, serverProblem } = useStore();
   const nav = useNavigate();
   const [portal, setPortal] = useState('staff');
   const [form, setForm] = useState({ username: '', password: '' });
@@ -53,6 +53,7 @@ export default function Login() {
           </div>
           <h2 className="text-2xl font-extrabold text-slate-900">Sign in</h2>
           <p className="mt-1 text-sm text-slate-500">Use the account given to you by the school.</p>
+          {serverProblem && <p role="alert" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"><b>Can’t reach the school server.</b> {serverProblem}</p>}
 
           <div className="mt-6 grid grid-cols-2 rounded-xl bg-slate-100 p-1 text-sm font-semibold">
             {[['staff', 'Staff'], ['parent', 'Parents']].map(([id, label]) => (

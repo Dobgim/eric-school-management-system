@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 // Local data lives outside server/ so `node --watch` does not restart on every database write.
-export const DATA_DIR = join(here, '..', '.data');
+export const DATA_DIR = process.env.SIS_DATA_DIR || join(here, '..', '.data');
 
 let impl;
 
@@ -16,7 +16,8 @@ async function connect() {
     const { default: pg } = await import('pg');
     const url = process.env.DATABASE_URL;
     const local = /localhost|127\.0\.0\.1/.test(url);
-    const pool = new pg.Pool({ connectionString: url, ssl: local || /sslmode=disable/.test(url) ? false : { rejectUnauthorized: false }, max: 10 });
+    // Serverless functions run many small instances: keep each one's pool small (use the provider's pooled URL).
+    const pool = new pg.Pool({ connectionString: url, ssl: local || /sslmode=disable/.test(url) ? false : { rejectUnauthorized: false }, max: process.env.VERCEL ? 3 : 10 });
     await pool.query('select 1');
     impl = {
       kind: `PostgreSQL (${new URL(url).hostname})`,
@@ -38,6 +39,13 @@ async function connect() {
       close: () => pool.end(),
     };
   } else {
+    if (process.env.VERCEL && !process.env.ALLOW_PGLITE) {
+      // Vercel has no lasting disk: a local database would lose everything. Say clearly what to set up.
+      const e = new Error('The school database is not connected yet. In Vercel, add a Postgres database (Storage → Neon) so DATABASE_URL is set, then redeploy.');
+      e.status = 503;
+      e.expose = true;
+      throw e;
+    }
     const { PGlite } = await import('@electric-sql/pglite');
     mkdirSync(DATA_DIR, { recursive: true });
     const lite = new PGlite(join(DATA_DIR, 'pgdata'));
@@ -56,4 +64,5 @@ async function connect() {
 }
 
 let ready;
-export const db = () => (ready ||= connect());
+// Retry on the next request if connecting failed (e.g. the database was asleep or not configured yet).
+export const db = () => (ready ||= connect().catch((e) => { ready = null; throw e; }));

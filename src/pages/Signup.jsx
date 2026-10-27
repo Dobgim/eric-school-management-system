@@ -27,7 +27,7 @@ const Choice = ({ active, onClick, icon: Icon, title, text }) => (
 );
 
 export default function Signup() {
-  const { school, enter } = useStore();
+  const { school, enter, serverProblem } = useStore();
   const nav = useNavigate();
   const [params, setParams] = useSearchParams();
   const invite = params.get('invite') || '';
@@ -97,6 +97,7 @@ export default function Signup() {
       <Link to="/" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-slate-800"><ArrowLeft className="size-4" />Back to sign in</Link>
       <h2 className="mt-4 text-2xl font-extrabold text-slate-900">{type === 'parent' ? 'Create a parent account' : 'Join as a member of staff'}</h2>
       <p className="mt-1 text-sm text-slate-500">{type === 'parent' ? 'For parents and guardians.' : 'Staff accounts need an invitation from the school.'}</p>
+      {serverProblem && <p role="alert" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"><b>Can’t reach the school server.</b> {serverProblem}</p>}
 
       <div className="mt-6 grid grid-cols-2 rounded-xl bg-slate-100 p-1 text-sm font-semibold">
         {[['parent', 'Parent / Guardian', Users], ['staff', 'Staff (invitation)', Briefcase]].map(([id, label, Icon]) => (

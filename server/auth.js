@@ -1,4 +1,4 @@
-import { randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -25,6 +25,9 @@ export async function verifyPassword(password, stored) {
 // JWT_SECRET should be set in production. Locally a random secret is generated once and kept in .data/.
 function secret() {
   if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+  // Hosts without a lasting disk (Vercel): fall back to a value derived from the database credentials so
+  // sessions survive restarts. Setting JWT_SECRET is still recommended.
+  if (process.env.DATABASE_URL) return createHash('sha256').update(`sis-session|${process.env.DATABASE_URL}`).digest('hex');
   const file = join(DATA_DIR, 'jwt-secret');
   if (!existsSync(file)) {
     mkdirSync(DATA_DIR, { recursive: true });

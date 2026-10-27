@@ -78,6 +78,7 @@ export function StoreProvider({ children }) {
   const [db, setDb] = useState(null);
   const [offline, setOffline] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [serverProblem, setServerProblem] = useState('');
   const [publicSchool, setPublicSchool] = useState(() => readCache()?.db?.school || { name: 'School Information System', motto: '' });
   const dbRef = useRef(null);
   const userRef = useRef(null);
@@ -113,7 +114,10 @@ export function StoreProvider({ children }) {
   // Startup: who is signed in? Fall back to the cached copy when there is no connection.
   useEffect(() => {
     (async () => {
-      request('/api/public/school').then(setPublicSchool).catch(() => {});
+      request('/api/public/school').then((s) => { setPublicSchool(s); setServerProblem(''); }).catch((e) => setServerProblem(
+        e.status === 404 ? 'The school server is not running at this address (the API answered 404). Deploy the latest version including the api/ folder, then reload.'
+          : e.status === 0 ? '' : e.message,
+      ));
       try {
         const { user: u } = await request('/api/auth/me');
         userRef.current = u;
@@ -137,9 +141,27 @@ export function StoreProvider({ children }) {
     })();
   }, [apply]);
 
-  // Live updates from other devices.
+  // Live updates from other devices: a server-sent event stream where the server can hold one open;
+  // on serverless hosting (Vercel) the app checks for changes every 10 s and whenever it comes back into view.
   useEffect(() => {
-    if (!user || typeof EventSource === 'undefined') return;
+    if (!user) return;
+    let stop = () => {};
+    let cancelled = false;
+    request('/api/health').catch(() => ({ live: true })).then(({ live }) => {
+      if (cancelled) return;
+      stop = live === false || typeof EventSource === 'undefined' ? poll() : stream();
+    });
+    return () => { cancelled = true; stop(); };
+  }, [user, reload]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function poll() {
+    const tick = () => { if (document.visibilityState === 'visible' && !inFlight.current) reload(); };
+    const id = setInterval(tick, 10000);
+    document.addEventListener('visibilitychange', tick);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', tick); };
+  }
+
+  function stream() {
     const es = new EventSource('/api/events');
     let timer;
     let hadError = false;
@@ -155,7 +177,7 @@ export function StoreProvider({ children }) {
     es.onerror = () => { hadError = true; setOffline(!navigator.onLine); };
     es.onopen = () => { if (hadError) { hadError = false; reload(); } setOffline(false); };
     return () => { clearTimeout(timer); es.close(); };
-  }, [user, reload]);
+  }
 
   const flush = useCallback(() => {
     if (flushing.current) return;
@@ -269,7 +291,7 @@ export function StoreProvider({ children }) {
   }, []);
 
   const school = db?.school || publicSchool;
-  const value = useMemo(() => ({ db, user, api, login, logout, enter, saveError, offline, status, school }), [db, user, api, login, logout, enter, saveError, offline, status, school]);
+  const value = useMemo(() => ({ db, user, api, login, logout, enter, saveError, offline, status, school, serverProblem }), [db, user, api, login, logout, enter, saveError, offline, status, school, serverProblem]);
 
   if (status === 'loading') {
     return (
