@@ -86,10 +86,31 @@ Tables ([server/schema.sql](server/schema.sql)):
 | Super Admin / Proprietor | Everything, including accounts and settings |
 | Admin / Secretary | Admissions, students, parents and their portal logins, classes, promotion, results, staff records, announcements |
 | Bursar / Accountant | Fees, fee structure, verifying parent payments, payroll, uniforms and materials, financial reports |
-| Teacher | Own class list, term results, promotion recommendations |
+| Teacher | Own class list, term results, promotion recommendations, own payslips |
+| Staff (general) | Other staff (nurse, storekeeper, kitchen, security…): own profile, own payslips, announcements |
 | Parent | Own children: profile, fees, receipts, results, paying fees, news |
 
-Create staff accounts under *Users & Activity*. Parent logins are created from *Parents & Guardians* → **Portal**.
+## Accounts and sign-up
+
+People can create their own account from the sign-in page (**Parent sign-up** / **Staff sign-up**). The office can also create accounts directly: staff under *Users & Activity*, parents from *Parents & Guardians* → **Portal**.
+
+**Parents** give their name, phone number (which becomes their username), a password, and their child's **registration number and date of birth**.
+
+- If those details match a pupil, and the phone number matches the parent recorded for that pupil, the account **opens immediately**. It's linked to that parent record, so it shows all their children.
+- Otherwise the request goes to **Sign-up requests**. The secretary or proprietor then links it to an existing parent record, or picks the pupil(s) it may see.
+
+**Staff** (teaching, secretariat, bursary or other staff) give their name, phone, job title, department, username and password.
+
+- The account stays **pending until the super admin approves it**. The super admin sets the real role and links or creates the staff record.
+- Asking for a department does not grant access. Nobody can give themselves bursar or admin rights.
+
+**Rules that apply to everyone:**
+
+- Pending and rejected accounts can't sign in. A rejected person sees the reason that was given.
+- Each new sign-up notifies the people who can approve it, and the sidebar shows a badge with the number waiting.
+- One phone number can't be used for two parent accounts.
+- A single connection is limited to 30 sign-ups per hour.
+- Approval logic is in [server/signup.js](server/signup.js).
 
 ## What's included
 
@@ -107,6 +128,7 @@ Create staff accounts under *Users & Activity*. Parent logins are created from *
 | Uniforms, books and materials: stock, sales to pupils, low-stock alerts, valuation | Uniforms & Materials |
 | Dashboard and 9 reports exportable to PDF and Excel | Dashboard, Reports |
 | Parent dashboard, online fee payment, receipts and statement, news | Parent portal |
+| Parent and staff self sign-up with school approval; staff payslips | Sign-up requests, My Payslips |
 | Live notifications on every signed-in device | Bell in the header |
 
 ## Parent payments
@@ -160,6 +182,7 @@ server/
   db.js        PostgreSQL (DATABASE_URL) or local PGlite
   auth.js      password hashing, session cookie
   momo.js      Mobile Money collection (demo / live)
+  signup.js    parent and staff self sign-up, approval and rejection
   setup.js     clean first-run data · reset.js wipes and recreates it
   schema.sql
 src/

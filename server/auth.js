@@ -37,6 +37,9 @@ export const toClientUser = (row) => row && ({
   id: row.id, name: row.name, username: row.username, role: row.role,
   staffId: row.staff_id || null, guardianId: row.guardian_id || null,
   active: row.active, lastLogin: row.last_login ? new Date(row.last_login).toISOString() : null,
+  status: row.status || 'active', phone: row.phone || '', email: row.email || '',
+  requestedRole: row.requested_role || null, signup: row.signup || null, reviewNote: row.review_note || '',
+  createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
 });
 
 export function setSessionCookie(req, res, user) {
@@ -53,7 +56,7 @@ export async function requireUser(req, res, next) {
     if (!token) return res.status(401).json({ error: 'Not signed in' });
     const { sub } = jwt.verify(token, secret());
     const { rows } = await (await db()).query('select * from users where id = $1', [sub]);
-    if (!rows[0] || !rows[0].active) { clearSessionCookie(res); return res.status(401).json({ error: 'Account not available' }); }
+    if (!rows[0] || !rows[0].active || (rows[0].status || 'active') !== 'active') { clearSessionCookie(res); return res.status(401).json({ error: 'Account not available' }); }
     req.user = toClientUser(rows[0]);
     next();
   } catch {

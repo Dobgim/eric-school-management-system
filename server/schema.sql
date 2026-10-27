@@ -36,3 +36,15 @@ create table if not exists counters (
   name text primary key,
   value integer not null default 0
 );
+
+-- Self sign-up (added later). Every statement is safe to run again.
+alter table users add column if not exists status text not null default 'active';
+alter table users add column if not exists phone text;
+alter table users add column if not exists email text;
+alter table users add column if not exists requested_role text;
+alter table users add column if not exists signup jsonb;
+alter table users add column if not exists review_note text;
+alter table users drop constraint if exists users_role_check;
+alter table users add constraint users_role_check check (role in ('superadmin', 'admin', 'bursar', 'teacher', 'staff', 'parent'));
+alter table users drop constraint if exists users_status_check;
+alter table users add constraint users_status_check check (status in ('active', 'pending', 'rejected'));

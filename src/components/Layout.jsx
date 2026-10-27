@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
   AlertTriangle, BarChart3, BookOpenCheck, Building2, ClipboardList, GraduationCap, LayoutDashboard, LogOut,
-  Megaphone, Menu, Smartphone, Package, Receipt, Settings2, ShieldCheck, Users, UserRound, Wallet, X, ArrowUpCircle, Home, Contact,
+  Megaphone, Menu, Smartphone, UserPlus, Package, Receipt, Settings2, ShieldCheck, Users, UserRound, Wallet, X, ArrowUpCircle, Home, Contact,
 } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { can } from '../lib/permissions';
@@ -29,6 +29,7 @@ const NAV = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard, perm: 'dashboard', end: true },
     { to: '/my-class', label: 'My Class', icon: GraduationCap, perm: 'myclass' },
     { to: '/portal', label: 'Dashboard', icon: Home, perm: 'portal', end: true },
+    { to: '/me', label: 'My Payslips', icon: Wallet, perm: 'me' },
   ] },
   { group: 'My family', items: [
     { to: '/portal/children', label: 'My Children', icon: Users, perm: 'portal' },
@@ -55,6 +56,7 @@ const NAV = [
     { to: '/reports', label: 'Reports', icon: BarChart3, perm: ['reports.financial', 'reports.academic'] },
     { to: '/announcements', label: 'Announcements', icon: Megaphone, perm: 'announcements.edit' },
     { to: '/school', label: 'School Profile', icon: Building2, perm: 'school.view' },
+    { to: '/signups', label: 'Sign-up requests', icon: UserPlus, perm: 'signups', badge: (db) => db.users.filter((u) => u.status === 'pending').length },
     { to: '/users', label: 'Users & Activity', icon: ShieldCheck, perm: 'users' },
   ] },
 ];
@@ -92,7 +94,13 @@ function ParentTabBar() {
   );
 }
 
-export const allowed = (user, perm) => (perm === 'users' ? user.role === 'superadmin' : [].concat(perm).some((p) => can(user, p)));
+export const allowed = (user, perm) => {
+  if (perm === 'users') return user.role === 'superadmin';
+  if (perm === 'signups') return user.role === 'superadmin' || user.role === 'admin';
+  // Own payslips: anyone linked to a staff record (the bursar and proprietor already see all of payroll).
+  if (perm === 'me') return !!user.staffId && ['admin', 'teacher', 'staff'].includes(user.role) || user.role === 'staff';
+  return [].concat(perm).some((p) => can(user, p));
+};
 
 export default function Layout() {
   const { db, user, logout, saveError, offline } = useStore();

@@ -237,20 +237,25 @@ export function StoreProvider({ children }) {
     request,
   }), [mutate, reload]);
 
+  // Start using the app as `u` once the server has set the session cookie (after login or a verified sign-up).
+  const enter = useCallback(async (u) => {
+    userRef.current = u;
+    const data = await request('/api/data');
+    apply(data, u);
+    setUser(u);
+    setOffline(false);
+    setStatus('ready');
+  }, [apply]);
+
   const login = useCallback(async (username, password, portal) => {
     try {
       const { user: u } = await request('/api/auth/login', { method: 'POST', body: { username, password, portal } });
-      userRef.current = u;
-      const data = await request('/api/data');
-      apply(data, u);
-      setUser(u);
-      setOffline(false);
-      setStatus('ready');
+      await enter(u);
       return { user: u };
     } catch (e) {
       return { error: e.message };
     }
-  }, [apply]);
+  }, [enter]);
 
   const logout = useCallback(async () => {
     try { await request('/api/auth/logout', { method: 'POST' }); } catch { /* offline: still clear locally */ }
@@ -263,7 +268,7 @@ export function StoreProvider({ children }) {
   }, []);
 
   const school = db?.school || publicSchool;
-  const value = useMemo(() => ({ db, user, api, login, logout, saveError, offline, status, school }), [db, user, api, login, logout, saveError, offline, status, school]);
+  const value = useMemo(() => ({ db, user, api, login, logout, enter, saveError, offline, status, school }), [db, user, api, login, logout, enter, saveError, offline, status, school]);
 
   if (status === 'loading') {
     return (

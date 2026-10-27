@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { homePath } from '../lib/permissions';
@@ -80,7 +80,14 @@ export default function Login() {
             <span>Parents: get the app on your phone</span>
             <InstallButton size="sm" />
           </div>
-          <p className="mt-8 text-center text-xs text-slate-500">Forgot your password? Ask the school office to reset it.</p>
+          <div className="mt-6 rounded-xl border border-slate-200 p-4 text-center">
+            <p className="text-sm text-slate-600">New here?</p>
+            <div className="mt-2 flex flex-wrap justify-center gap-2">
+              <Link to="/signup"><Button variant="secondary" size="sm">Parent sign-up</Button></Link>
+              <Link to="/signup?as=staff"><Button variant="secondary" size="sm">Staff sign-up</Button></Link>
+            </div>
+          </div>
+          <p className="mt-6 text-center text-xs text-slate-500">Forgot your password? Ask the school office to reset it.</p>
         </div>
       </div>
     </div>

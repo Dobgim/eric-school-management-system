@@ -90,6 +90,7 @@ export const ROLES = {
   admin: 'Admin / Secretary',
   bursar: 'Bursar / Accountant',
   teacher: 'Teacher',
+  staff: 'Staff (general)',
   parent: 'Parent / Guardian',
 };
 

@@ -11,6 +11,7 @@ const MATRIX = {
     'reports.financial', 'reports.academic',
   ],
   teacher: ['myclass', 'academics.edit', 'school.view'],
+  staff: [],
   parent: ['portal'],
 };
 
@@ -24,5 +25,6 @@ export function homePath(user) {
   if (!user) return '/login';
   if (user.role === 'parent') return '/portal';
   if (user.role === 'teacher') return '/my-class';
+  if (user.role === 'staff') return '/me';
   return '/';
 }

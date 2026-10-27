@@ -11,6 +11,7 @@ import { COUNTER_ACCESS, Forbidden, applyOps, loadAll, newId, nextCounter, viewF
 import { db } from './db.js';
 import { collect, detectOperator, momoMode, normalizePhone } from './momo.js';
 import { ensureSetup } from './setup.js';
+import { signupRoutes } from './signup.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DIST = join(here, '..', 'dist');
@@ -64,6 +65,8 @@ app.post('/api/auth/login', wrap(async (req, res) => {
     recordFailure(key);
     return res.status(401).json({ error: 'Incorrect username or password.' });
   }
+  if (row.status === 'pending') return res.status(403).json({ error: 'Your account is waiting for approval by the school. You can sign in once it is approved.' });
+  if (row.status === 'rejected') return res.status(403).json({ error: `Your sign-up was not approved${row.review_note ? `: ${row.review_note}` : '.'} Please contact the school office.` });
   if (!row.active) return res.status(403).json({ error: 'This account has been deactivated. Contact the administrator.' });
   if (portal === 'parent' && row.role !== 'parent') return res.status(403).json({ error: 'This is a staff account — use the Staff tab.' });
   if (portal === 'staff' && row.role === 'parent') return res.status(403).json({ error: 'This is a parent account — use the Parents tab.' });
@@ -173,6 +176,8 @@ app.post('/api/payments/online', requireUser, wrap(async (req, res) => {
   broadcast({ type: 'change', by: null, collections: ['payments', 'paymentRequests', 'notifications'] });
   res.json({ ok: true, transactionId: result.transactionId, payments: created, total, demo: momoMode() === 'demo' });
 }));
+
+signupRoutes(app, wrap, requireUser, broadcast);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 

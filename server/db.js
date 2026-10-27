@@ -49,8 +49,9 @@ async function connect() {
       close: () => lite.close(),
     };
   }
-  // Create tables on first run (every statement is idempotent).
-  for (const stmt of readFileSync(join(here, 'schema.sql'), 'utf8').split(';').map((s) => s.trim()).filter(Boolean)) await impl.query(stmt);
+  // Create tables on first run (every statement is idempotent). Comments are stripped before splitting on ';'.
+  const sql = readFileSync(join(here, 'schema.sql'), 'utf8').replace(/--[^\n]*/g, '');
+  for (const stmt of sql.split(';').map((s) => s.trim()).filter(Boolean)) await impl.query(stmt);
   return impl;
 }
 

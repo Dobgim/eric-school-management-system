@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { KeyRound, Pencil, ShieldCheck, UserPlus } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { exportExcel, exportTablePDF } from '../lib/exporters';
@@ -69,13 +70,13 @@ function UserList() {
           { key: 'role', label: 'Role', render: (u) => <Badge tone={ROLE_TONE[u.role]}>{ROLES[u.role]}</Badge> },
           { key: 'link', label: 'Linked to', render: (u) => { const s = db.staff.find((x) => x.id === u.staffId); const g = db.guardians.find((x) => x.id === u.guardianId); return s ? `${s.firstName} ${s.lastName} (staff)` : g ? `${g.name} (parent)` : '—'; } },
           { key: 'lastLogin', label: 'Last sign-in', render: (u) => fmtDateTime(u.lastLogin) },
-          { key: 'active', label: 'Status', render: (u) => (u.active ? <Badge tone="green">Active</Badge> : <Badge>Disabled</Badge>) },
-          { key: 'a', label: '', align: 'right', render: (u) => (
+          { key: 'active', label: 'Status', render: (u) => (u.status === 'pending' ? <Badge tone="amber">Waiting approval</Badge> : u.status === 'rejected' ? <Badge tone="red">Rejected</Badge> : u.active ? <Badge tone="green">Active</Badge> : <Badge>Disabled</Badge>) },
+          { key: 'a', label: '', align: 'right', render: (u) => (u.status !== 'active' ? (u.status === 'pending' && <Link to="/signups" className="text-sm font-semibold text-brand-700 hover:underline">Review</Link>) : (
             <div className="flex justify-end gap-1">
               <Button size="sm" variant="ghost" icon={KeyRound} onClick={() => setForm({ ...u, password: Math.random().toString(36).slice(2, 10) })}>Reset</Button>
               <Button size="sm" variant="ghost" icon={Pencil} onClick={() => setForm({ ...u, password: '' })} aria-label="Edit" />
             </div>
-          ) },
+          )) },
         ]}
       />
       <Modal open={!!form} onClose={() => setForm(null)} title={form?.id ? `Edit @${form.username}` : 'New user'} footer={<><Button variant="secondary" onClick={() => setForm(null)}>Cancel</Button><Button onClick={save}>Save</Button></>}>

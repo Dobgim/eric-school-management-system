@@ -35,7 +35,7 @@ export async function loadAll(q) {
 const teacherClassId = (all, user) => all.classes.find((c) => c.teacherId && c.teacherId === user.staffId)?.id || null;
 const parentChildIds = (all, user) => all.students.filter((s) => (s.guardianIds || []).includes(user.guardianId)).map((s) => s.id);
 const forUser = (n, user) => (n.userIds || []).includes(user.id) || (n.roles || []).includes(user.role);
-const minimalUsers = (all) => all.users.map((u) => ({ id: u.id, name: u.name, role: u.role }));
+const minimalUsers = (all) => all.users.filter((u) => u.status === 'active').map((u) => ({ id: u.id, name: u.name, role: u.role }));
 const staffCard = (s) => ({ id: s.id, firstName: s.firstName, lastName: s.lastName, gender: s.gender, phone: s.phone, position: s.position, classId: s.classId, category: s.category, status: s.status, staffNo: s.staffNo });
 
 /** The slice of the database a user is allowed to read. */
@@ -66,6 +66,23 @@ export function viewFor(user, all) {
     };
   }
 
+  // Own payslips only, for any staff member who is not in charge of payroll.
+  const ownPay = () => all.payrollRuns.map((r) => ({ ...r, items: r.items.filter((i) => i.staffId === user.staffId) })).filter((r) => user.staffId && r.items.length);
+  const ownStaff = (list) => list.map((s) => (s.id === user.staffId ? all.staff.find((x) => x.id === s.id) : s));
+  const ownScale = () => { const me = all.staff.find((s) => s.id === user.staffId); return all.salaryScales.filter((g) => g.id === me?.gradeId); };
+
+  if (user.role === 'staff') {
+    return {
+      ...empty, ...base,
+      settings: { currentSessionId: all.settings.currentSessionId, currentTermId: all.settings.currentTermId, counters: {} },
+      staff: all.staff.filter((s) => s.id === user.staffId),
+      salaryScales: ownScale(),
+      payrollRuns: ownPay(),
+      announcements: all.announcements.filter((a) => a.audience === 'all' || a.audience === 'staff'),
+      users: minimalUsers(all),
+    };
+  }
+
   if (user.role === 'teacher') {
     const classId = teacherClassId(all, user);
     const pupils = all.students.filter((s) => s.classId === classId || Object.values(s.enrollments || {}).includes(classId));
@@ -80,14 +97,16 @@ export function viewFor(user, all) {
       academicRecords: all.academicRecords.filter((r) => ids.has(r.studentId) || r.classId === classId),
       promotionRecommendations: all.promotionRecommendations.filter((r) => ids.has(r.studentId)),
       announcements: all.announcements.filter((a) => a.audience === 'all' || a.audience === 'staff'),
-      staff: all.staff.map(staffCard),
+      staff: ownStaff(all.staff.map(staffCard)),
+      salaryScales: ownScale(),
+      payrollRuns: ownPay(),
       users: minimalUsers(all),
     };
   }
 
   // Office staff. The secretary does not see payroll; only the super admin sees account details.
   const view = { ...all, ...base, notifications: base.notifications };
-  if (user.role === 'admin') { view.payrollRuns = []; view.salaryAdjustments = []; }
+  if (user.role === 'admin') { view.payrollRuns = ownPay(); view.salaryAdjustments = []; }
   if (user.role !== 'superadmin') view.users = user.role === 'admin' ? all.users.filter((u) => u.role === 'parent').concat(minimalUsers(all).filter((u) => u.role !== 'parent')) : minimalUsers(all);
   return view;
 }
@@ -104,6 +123,7 @@ export const COUNTER_ACCESS = {
   bursar: ['receipt', 'staff', 'sale', 'request'],
   parent: ['request'],
   teacher: [],
+  staff: [],
 };
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -211,7 +231,8 @@ async function writeUser(q, user, all, op) {
   const existing = all.users.find((u) => u.id === (op.id || v.id));
   const canManage = user.role === 'superadmin' || (user.role === 'admin' && v.role === 'parent' && (!existing || existing.role === 'parent'));
   if (op.t !== 'put' || !canManage) throw new Forbidden('Only the super admin can manage these accounts.');
-  if (!['superadmin', 'admin', 'bursar', 'teacher', 'parent'].includes(v.role)) throw new Invalid('Invalid role.');
+  if (!['superadmin', 'admin', 'bursar', 'teacher', 'staff', 'parent'].includes(v.role)) throw new Invalid('Invalid role.');
+  if (existing && existing.status !== 'active') throw new Invalid('Approve or reject this sign-up from Sign-up requests first.');
   const username = String(v.username || '').trim();
   if (!username || !String(v.name || '').trim()) throw new Invalid('Name and username are required.');
   if (all.users.some((u) => u.id !== v.id && u.username.toLowerCase() === username.toLowerCase())) throw new Invalid('That username is taken.');
