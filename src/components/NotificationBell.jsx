@@ -122,7 +122,7 @@ export default function NotificationBell() {
       )}
 
       {popup && createPortal(
-        <div className="fixed right-4 bottom-4 z-[60] w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" role="status">
+        <div className="fixed right-4 bottom-24 z-[60] lg:bottom-4 w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" role="status">
           <div className="flex items-start">
             <div className="flex-1"><Item n={popup} unread onOpen={open$} /></div>
             <button type="button" onClick={() => setPopup(null)} className="m-2 rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Dismiss"><X className="size-4" /></button>

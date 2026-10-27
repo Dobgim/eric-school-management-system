@@ -5,6 +5,7 @@ import { useStore } from '../lib/store';
 import { homePath } from '../lib/permissions';
 import { Logo } from '../components/Layout';
 import { Button, Field, Input } from '../components/ui';
+import { InstallButton } from '../components/InstallApp';
 
 const DEMO = {
   staff: [
@@ -84,6 +85,11 @@ export default function Login() {
             {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
             <Button type="submit" icon={LogIn} className="w-full" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</Button>
           </form>
+
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-sm text-slate-500">
+            <span>Parents: get the app on your phone</span>
+            <InstallButton size="sm" />
+          </div>
 
           <div className="mt-8 rounded-xl border border-dashed border-slate-300 p-4">
             <p className="text-xs font-bold tracking-wide text-slate-500 uppercase">Demo accounts</p>

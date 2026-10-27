@@ -41,3 +41,7 @@
 @media print {
   .no-print { display: none !important; }
 }
+
+/* Installed app on notched phones: keep content clear of the status bar and home indicator. */
+.safe-top { padding-top: max(0.75rem, env(safe-area-inset-top)); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }

@@ -250,7 +250,7 @@ export function Toast({ message, onDone }) {
   }, [message, onDone]);
   if (!message) return null;
   return createPortal(
-    <div className="fixed right-4 bottom-4 z-[60] rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-xl">{message}</div>,
+    <div className="fixed right-4 bottom-24 z-[60] lg:bottom-4 rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-xl">{message}</div>,
     document.body,
   );
 }

@@ -8,6 +8,7 @@ import { Avatar, Badge, Button, Card, Empty, FeeBadge, PageHeader, StatCard } fr
 import { Progress } from '../components/Charts';
 import { visibleAnnouncements } from './Announcements';
 import { myChildren } from './Portal';
+import { InstallCard } from '../components/InstallApp';
 
 export const REQUEST_STATUS = {
   pending: ['amber', 'Awaiting verification'],
@@ -36,6 +37,7 @@ export default function ParentDashboard() {
   return (
     <>
       <PageHeader title={`Welcome, ${user.name}`} subtitle={`${term.label} · ${db.school.name}`} />
+      <InstallCard schoolName={db.school.shortName || db.school.name} />
 
       {owing - pending > 0 && (
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-brand-800 to-brand-600 px-6 py-5 text-white shadow-sm">

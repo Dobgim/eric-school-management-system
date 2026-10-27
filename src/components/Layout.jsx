@@ -10,6 +10,7 @@ import { currentTerm } from '../lib/finance';
 import { ROLES } from '../lib/utils';
 import { Avatar } from './ui';
 import NotificationBell from './NotificationBell';
+import { InstallButton, UpdateBanner } from './InstallApp';
 
 export function Logo({ school, size = 'md' }) {
   const s = size === 'lg' ? 'size-16' : 'size-10';
@@ -58,6 +59,39 @@ const NAV = [
   ] },
 ];
 
+const PARENT_TABS = [
+  { to: '/portal', label: 'Home', icon: Home, end: true },
+  { to: '/portal/children', label: 'Children', icon: Users },
+  { to: '/portal/pay', label: 'Pay', icon: Smartphone, primary: true },
+  { to: '/portal/payments', label: 'Receipts', icon: Receipt },
+  { to: '/portal/news', label: 'News', icon: Megaphone },
+];
+
+/** App-style bottom navigation for parents on phones. */
+function ParentTabBar() {
+  return (
+    <nav className="no-print safe-bottom fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden" aria-label="Parent navigation">
+      {PARENT_TABS.map((t) => (
+        <NavLink
+          key={t.to}
+          to={t.to}
+          end={t.end}
+          className={({ isActive }) => `flex flex-col items-center gap-0.5 pt-2 pb-1.5 text-[11px] font-semibold ${isActive ? 'text-brand-700' : 'text-slate-500'}`}
+        >
+          {({ isActive }) => (
+            <>
+              <span className={t.primary ? `-mt-6 grid size-12 place-items-center rounded-full shadow-lg ring-4 ring-white ${isActive ? 'bg-brand-800' : 'bg-brand-700'} text-white` : 'grid h-6 place-items-center'}>
+                <t.icon className={t.primary ? 'size-5' : 'size-5'} />
+              </span>
+              {t.label}
+            </>
+          )}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
 export const allowed = (user, perm) => (perm === 'users' ? user.role === 'superadmin' : [].concat(perm).some((p) => can(user, p)));
 
 export default function Layout() {
@@ -100,6 +134,7 @@ export default function Layout() {
         })}
       </div>
       <div className="border-t border-white/10 p-3">
+        <InstallButton variant="ghost" className="w-full !justify-start gap-3 !px-3 !font-medium !text-brand-200 hover:!bg-white/5 hover:!text-white" />
         <NavLink to="/account" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-brand-200 hover:bg-white/5 hover:text-white">
           <Settings2 className="size-4.5" /> My Account
         </NavLink>
@@ -123,7 +158,8 @@ export default function Layout() {
         </div>
       )}
       <div className="min-w-0">
-        <header className="no-print sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur sm:px-6">
+        <UpdateBanner />
+        <header className="no-print safe-top sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur sm:px-6">
           <button onClick={() => setOpen(true)} className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden" aria-label="Open menu"><Menu className="size-5" /></button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs text-slate-500">Academic session</p>
@@ -139,10 +175,11 @@ export default function Layout() {
           </div>
         </header>
         {saveError && <div className="bg-rose-600 px-4 py-2 text-center text-sm font-medium text-white">{saveError}</div>}
-        <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:py-8">
+        <main className={`mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:py-8 ${user.role === 'parent' ? 'pb-28 lg:pb-8' : ''}`}>
           <Outlet />
         </main>
       </div>
+      {user.role === 'parent' && <ParentTabBar />}
     </div>
   );
 }

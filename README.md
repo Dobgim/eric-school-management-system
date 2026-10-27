@@ -60,6 +60,24 @@ Each payment clears the pupil's oldest unpaid term first. A transaction ID can't
 
 Then replace `requestCollection()` in [src/lib/momo.js](src/lib/momo.js) with a call to that server. Never put API keys in the frontend.
 
+## Installable app (PWA)
+
+The system is a Progressive Web App, so parents and staff can install it straight from the browser, without an app store:
+
+- **Android / Chrome / Edge:** tap **Install app** (the card on the parent dashboard, the sidebar, or the login page), or use the browser menu → *Install app*.
+- **iPhone / iPad:** open the site in Safari → **Share** → **Add to Home Screen**. The app shows these steps itself.
+
+Once installed it:
+- opens full-screen from the home screen;
+- has a bottom tab bar for parents (Home, Children, Pay, Receipts, News);
+- offers shortcuts (Pay fees, Receipts, News) when you long-press the icon;
+- keeps working without internet, because the service worker caches the app and the data is on the device;
+- shows an **Update now** banner when a new version is deployed.
+
+The relevant files are [public/manifest.webmanifest](public/manifest.webmanifest), [public/sw.js](public/sw.js), [src/lib/pwa.js](src/lib/pwa.js) and the icons in [public/icons/](public/icons/). The service worker only runs in production builds (`npm run build` then `npm run preview`), not in `npm run dev`.
+
+**Phones can only install it once it is online over HTTPS.** Deploy the `dist/` folder to any static host; Vercel and Netlify are both free and can deploy straight from the GitHub repo. [vercel.json](vercel.json) and `public/_redirects` / `public/_headers` (for Netlify) already handle page routes and caching. If the school name changes, also update `name` / `short_name` in the manifest and the `<title>` / `apple-mobile-web-app-title` in [index.html](index.html).
+
 ## Where the data lives
 
 All data is held in the browser's `localStorage` (key `sis:data:v1`). The first visit loads a full set of demo data: 2 sessions, about 140 pupils, 16 staff, payments, payroll and stock.

@@ -54,7 +54,20 @@ export default function ParentPayments() {
       />
       {tab === 'receipts' ? (
         <Card bodyClass="" actions={kids.length > 1 && <Select value={childId} onChange={(e) => setChildId(e.target.value)} placeholder="All children" options={kids.map((k) => ({ value: k.id, label: fullName(k) }))} className="w-56" />} title="Official receipts">
-          <DataTable
+          {/* Phones: one card per receipt instead of a wide table. */}
+          <ul className="divide-y divide-slate-100 md:hidden">
+            {payments.length ? payments.map((p) => (
+              <li key={p.id} className="flex items-center gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-slate-900">{money(p.amount, db.school.currency)} <span className="font-medium text-slate-500">· {kidName(p.studentId).split(' ')[0]}</span></p>
+                  <p className="text-xs text-slate-500">{fmtDate(p.date)} · {methodLabel(p.method)}{p.channel === 'online' ? ' · online' : ''}</p>
+                  <p className="text-xs text-slate-400">{termLabel(p.termId)} · <span className="font-mono">{p.receiptNo}</span></p>
+                </div>
+                <Button size="sm" variant="secondary" icon={Download} onClick={() => downloadReceipt(db, p)} aria-label={`Download receipt ${p.receiptNo}`}>PDF</Button>
+              </li>
+            )) : <Empty title="No payments yet" />}
+          </ul>
+          <div className="hidden md:block"><DataTable
             rows={payments}
             pageSize={20}
             empty={<Empty title="No payments yet" />}
@@ -66,11 +79,24 @@ export default function ParentPayments() {
               { key: 'amount', label: 'Amount', align: 'right', render: (p) => <b>{money(p.amount, '')}</b> },
               { key: 'r', label: '', align: 'right', render: (p) => <Button size="sm" variant="ghost" icon={Download} onClick={() => downloadReceipt(db, p)}>{p.receiptNo}</Button> },
             ]}
-          />
+          /></div>
         </Card>
       ) : (
         <Card bodyClass="" title="Payments you made through the portal">
-          <DataTable
+          <ul className="divide-y divide-slate-100 md:hidden">
+            {requests.length ? requests.map((r) => (
+              <li key={r.id} className="px-4 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-bold text-slate-900">{money(r.amount, db.school.currency)}</p>
+                  <Badge tone={REQUEST_STATUS[r.status][0]}>{REQUEST_STATUS[r.status][1]}</Badge>
+                </div>
+                <p className="text-xs text-slate-500">{fmtDate(r.createdAt)} · {methodLabel(r.method)} · <span className="font-mono">{r.reference}</span></p>
+                <p className="text-xs text-slate-500">For {r.items.map((i) => `${kidName(i.studentId).split(' ')[0]} (${money(i.amount, '').trim()})`).join(', ')}</p>
+                {r.reviewNote && <p className="mt-1 rounded-lg bg-slate-50 px-2 py-1 text-xs text-slate-600">{r.reviewNote}</p>}
+              </li>
+            )) : <Empty title="Nothing submitted yet" />}
+          </ul>
+          <div className="hidden md:block"><DataTable
             rows={requests}
             empty={<Empty title="Nothing submitted yet" message="When you pay by MoMo USSD or bank and submit the transaction ID, it appears here until the bursar confirms it." />}
             columns={[
@@ -81,7 +107,7 @@ export default function ParentPayments() {
               { key: 'amount', label: 'Amount', align: 'right', render: (r) => <b>{money(r.amount, '')}</b> },
               { key: 'status', label: 'Status', render: (r) => <div><Badge tone={REQUEST_STATUS[r.status][0]}>{REQUEST_STATUS[r.status][1]}</Badge>{r.reviewNote && <p className="mt-0.5 max-w-56 text-xs text-slate-500">{r.reviewNote}</p>}</div> },
             ]}
-          />
+          /></div>
         </Card>
       )}
     </>
