@@ -20,7 +20,7 @@ export default function MyClass() {
   return (
     <>
       <PageHeader title={`My Class · ${cls.name}`} subtitle={`${term.label} · ${db.facilities.find((f) => f.id === cls.facilityId)?.name || ''}`} />
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
         <StatCard label="Pupils" value={`${pupils.length} / ${cls.capacity}`} icon={Users} />
         <StatCard label="Boys" value={boys} tone="blue" />
         <StatCard label="Girls" value={pupils.length - boys} tone="purple" />

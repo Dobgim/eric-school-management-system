@@ -22,7 +22,7 @@ export default function Inventory() {
     <>
       {toast}
       <PageHeader title="Uniforms & School Materials" subtitle="Stock of uniforms, books and materials, sales to pupils, and low-stock alerts." />
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Items in catalogue" value={db.inventory.length} hint={`${sum(db.inventory, (i) => i.quantity)} units in stock`} />
         <StatCard label="Stock value (cost)" value={money(cost, cur)} tone="purple" hint={`Retail value ${money(retail, cur)}`} />
         <StatCard label="Sales to date" value={money(salesTotal, cur)} tone="green" hint={`${db.sales.length} sales`} />
@@ -162,10 +162,11 @@ function NewSale({ notify, onDone }) {
     setPick('');
   };
 
-  const save = () => {
+  const save = async () => {
     if (!student) return notify('Choose the pupil.');
     if (!lines.length) return notify('Add at least one item.');
-    const saleNo = `SAL-${pad(api.nextCounter('sale'), 5)}`;
+    let saleNo;
+    try { saleNo = `SAL-${pad(await api.nextCounter('sale'), 5)}`; } catch (e) { return notify(e.message); }
     const saleId = uid('sl');
     api.mutate((d) => {
       d.sales.push({ id: saleId, saleNo, studentId, date, items: lines.map(({ max, ...l }) => l), total, method, by: user.id });
@@ -307,7 +308,7 @@ function Valuation() {
   const summary = [['Total cost value', money(sum(rows, (r) => r.costValue), cur)], ['Total retail value', money(sum(rows, (r) => r.retailValue), cur)], ['Potential margin', money(sum(rows, (r) => r.retailValue - r.costValue), cur)]];
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {byCat.map((x) => <StatCard key={x.c} label={x.c} value={money(x.cost, cur)} hint={`Retail ${money(x.retail, cur)}`} icon={x.c === 'Uniform' ? SlidersHorizontal : PackagePlus} />)}
       </div>
       <Card title="Inventory valuation" bodyClass="" actions={<ExportButtons onPdf={() => exportTablePDF({ school: db.school, title: 'Inventory Valuation Report', columns: pdfCols, rows, summary, landscape: true })} onExcel={() => exportExcel({ title: 'Inventory Valuation', columns: cols, rows })} />}>

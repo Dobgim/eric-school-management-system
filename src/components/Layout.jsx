@@ -95,7 +95,7 @@ function ParentTabBar() {
 export const allowed = (user, perm) => (perm === 'users' ? user.role === 'superadmin' : [].concat(perm).some((p) => can(user, p)));
 
 export default function Layout() {
-  const { db, user, logout, saveError } = useStore();
+  const { db, user, logout, saveError, offline } = useStore();
   const [open, setOpen] = useState(false);
   const term = currentTerm(db);
 
@@ -174,7 +174,8 @@ export default function Layout() {
             </div>
           </div>
         </header>
-        {saveError && <div className="bg-rose-600 px-4 py-2 text-center text-sm font-medium text-white">{saveError}</div>}
+        {offline && <div className="no-print bg-amber-500 px-4 py-2 text-center text-sm font-semibold text-slate-900">You’re offline — showing the last saved data. Changes can’t be saved until you reconnect.</div>}
+        {saveError && <div className="no-print sticky top-[61px] z-20 bg-rose-600 px-4 py-2 text-center text-sm font-medium text-white">{saveError}</div>}
         <main className={`mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:py-8 ${user.role === 'parent' ? 'pb-28 lg:pb-8' : ''}`}>
           <Outlet />
         </main>

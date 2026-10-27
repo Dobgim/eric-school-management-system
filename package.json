@@ -4,14 +4,24 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node node_modules/vite/bin/vite.js --port 5260",
-    "build": "node node_modules/vite/bin/vite.js build",
-    "preview": "node node_modules/vite/bin/vite.js preview --port 5260"
+    "dev": "concurrently -k -n api,web -c magenta,blue \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:web": "vite --port 5260 --strictPort",
+    "dev:api": "node --watch-path=server server/index.js",
+    "build": "vite build",
+    "start": "node server/index.js",
+    "db:reset": "node server/reset.js",
+    "preview": "vite preview --port 5260"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.2.17",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.3",
+    "jsonwebtoken": "^9.0.3",
     "jspdf": "2.5.2",
     "jspdf-autotable": "3.8.4",
     "lucide-react": "^1.46.0",
+    "pg": "^8.23.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.4"
@@ -19,7 +29,11 @@
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^9.2.5",
     "tailwindcss": "4.3.3",
     "vite": "^8.3.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

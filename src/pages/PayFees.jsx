@@ -4,13 +4,11 @@ import { Building2, CheckCircle2, Download, FileUp, Info as InfoIcon, Landmark, 
 import { useStore } from '../lib/store';
 import { feeStatus, pendingFor } from '../lib/finance';
 import { downloadReceipt } from '../lib/documents';
-import { OPERATORS, detectOperator, normalizePhone, requestCollection } from '../lib/momo';
-import { nextRequestRef, recordPayment } from '../lib/payments';
+import { OPERATORS, detectOperator, normalizePhone } from '../lib/momo';
+import { nextRequestRef } from '../lib/payments';
 import { fmtDate, fullName, methodLabel, money, readFileAsDataURL, sum, today, uid } from '../lib/utils';
 import { Avatar, Badge, Button, Card, Empty, Field, Input, PageHeader, Select, Textarea } from '../components/ui';
 import { myChildren } from './Portal';
-
-const childNames = (db, items) => items.map((i) => { const s = db.students.find((x) => x.id === i.studentId); return `${s.firstName} ${s.lastName} (${money(i.amount, db.school.currency)})`; }).join(', ');
 
 export default function PayFees() {
   const { db, user } = useStore();
@@ -118,30 +116,18 @@ function PromptPay({ items, total, defaultPhone, onDone }) {
     if (!total) return setError('Enter an amount for at least one child.');
     if (detectOperator(phone) !== operator) return setError(`Enter a valid ${OPERATORS[operator].label} number (9 digits, e.g. ${operator === 'mtn' ? '677 12 34 56' : '699 12 34 56'}).`);
     setState('sending');
-    const res = await requestCollection({ operator, phone, amount: total }, (s) => setState(s));
-    if (!res.ok) {
+    // The server asks the operator to collect, records the payments and tells the bursar.
+    const prompted = setTimeout(() => setState((s) => (s === 'sending' ? 'prompted' : s)), 900);
+    try {
+      const res = await api.request('/api/payments/online', { method: 'POST', body: { items, operator, phone: normalizePhone(phone) } });
+      await api.reload();
+      onDone({ kind: 'online', payments: res.payments, transactionId: res.transactionId, total: res.total, operator });
+    } catch (e) {
       setState('failed');
-      setError(res.reason);
-      api.log('Online payment failed', `${user.name} — ${money(total, cur)} via ${OPERATORS[operator].label}: ${res.reason}`);
-      return;
+      setError(e.message);
+    } finally {
+      clearTimeout(prompted);
     }
-    const ref = nextRequestRef(api);
-    const payments = items.flatMap((i) => recordPayment(db, api, {
-      studentId: i.studentId, amount: i.amount, method: operator, reference: res.transactionId,
-      receivedBy: user.id, channel: 'online', note: `Paid online by ${user.name} (${normalizePhone(phone)})`,
-    }));
-    api.add('paymentRequests', {
-      id: uid('rq'), ref, channel: 'online', status: 'approved', method: operator, guardianId: user.guardianId, userId: user.id,
-      payerPhone: normalizePhone(phone), reference: res.transactionId, paidOn: today(), items, amount: total,
-      createdAt: new Date().toISOString(), reviewedAt: new Date().toISOString(), paymentIds: payments.map((p) => p.id),
-    });
-    api.log('Paid fees online', `${user.name} — ${money(total, cur)} via ${OPERATORS[operator].label} (${res.transactionId})`);
-    api.notify({
-      roles: ['bursar', 'superadmin'], kind: 'payment', link: '/fees',
-      title: `${money(total, cur)} paid online by ${user.name}`,
-      body: `${childNames(db, items)} · ${OPERATORS[operator].label} · ${res.transactionId} · receipts ${payments.map((p) => p.receiptNo).join(', ')}`,
-    });
-    onDone({ kind: 'online', payments, transactionId: res.transactionId, total, operator });
   };
 
   if (state === 'sending' || state === 'prompted') {
@@ -199,24 +185,30 @@ function ManualPay({ items, total, defaultPhone, onDone }) {
     setF({ ...f, proof: await readFileAsDataURL(file), proofName: file.name });
   };
 
-  const submit = () => {
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
     setError('');
     if (!total) return setError('Enter an amount for at least one child.');
     if (f.reference.trim().length < 4) return setError(f.method === 'bank' ? 'Enter the bank slip / transfer reference.' : 'Enter the transaction ID from your confirmation SMS.');
     const ref = f.reference.trim().toLowerCase();
     if (db.payments.some((p) => p.reference?.toLowerCase() === ref) || db.paymentRequests.some((r) => r.status !== 'rejected' && r.reference?.toLowerCase() === ref)) return setError('This transaction ID has already been used.');
-    const request = {
-      id: uid('rq'), ref: nextRequestRef(api), channel: 'manual', status: 'pending', method: f.method,
-      guardianId: user.guardianId, userId: user.id, payerPhone: f.payerPhone, reference: f.reference.trim(), paidOn: f.paidOn,
-      proof: f.proof, proofName: f.proofName, note: f.note, items, amount: total, createdAt: new Date().toISOString(),
-    };
-    api.add('paymentRequests', request);
+    setBusy(true);
+    let request;
+    try {
+      request = {
+        id: uid('rq'), ref: await nextRequestRef(api), channel: 'manual', status: 'pending', method: f.method,
+        guardianId: user.guardianId, userId: user.id, payerPhone: f.payerPhone, reference: f.reference.trim(), paidOn: f.paidOn,
+        proof: f.proof, proofName: f.proofName, note: f.note, items, amount: total, createdAt: new Date().toISOString(),
+      };
+      // Saved straight away (not queued) so the parent sees any problem; the server also alerts the bursar.
+      await api.request('/api/ops', { method: 'POST', body: { ops: [{ t: 'put', c: 'paymentRequests', v: request }] } });
+      await api.reload();
+    } catch (e) {
+      setBusy(false);
+      return setError(e.message);
+    }
+    setBusy(false);
     api.log('Submitted payment for verification', `${user.name} — ${money(total, cur)} via ${methodLabel(f.method)} (${request.reference})`);
-    api.notify({
-      roles: ['bursar', 'superadmin'], kind: 'verify', link: '/fees/online',
-      title: `Payment to verify: ${money(total, cur)} from ${user.name}`,
-      body: `${childNames(db, items)} · ${methodLabel(f.method)} · ${request.reference}`,
-    });
     onDone({ kind: 'manual', request });
   };
 
@@ -247,7 +239,7 @@ function ManualPay({ items, total, defaultPhone, onDone }) {
       </label>
       <Textarea rows={2} placeholder="Note for the bursar (optional)" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} />
       {error && <p className="flex gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700"><XCircle className="mt-0.5 size-4 shrink-0" />{error}</p>}
-      <Button className="w-full py-3" disabled={!total} onClick={submit}>Submit {money(total, cur)} for verification</Button>
+      <Button className="w-full py-3" disabled={!total || busy} onClick={submit}>{busy ? 'Sending…' : `Submit ${money(total, cur)} for verification`}</Button>
       <p className="text-center text-xs text-slate-500">The bursar checks the transaction and your official receipt appears under Payments & Receipts.</p>
     </div>
   );

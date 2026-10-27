@@ -4,7 +4,7 @@ import { KeyRound, Pencil, Plus } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { feeStatus } from '../lib/finance';
 import { exportExcel, exportTablePDF } from '../lib/exporters';
-import { hashPassword, money, uid } from '../lib/utils';
+import { money, uid } from '../lib/utils';
 import { Badge, Button, Card, DataTable, ExportButtons, Field, Input, Modal, PageHeader, SearchInput, Select, useToast } from '../components/ui';
 
 export default function Guardians() {
@@ -39,9 +39,11 @@ export default function Guardians() {
     const { g, username, password } = account;
     if (!username.trim() || password.length < 6) return notify('Username and a password of at least 6 characters are required.');
     if (db.users.some((u) => u.username.toLowerCase() === username.trim().toLowerCase() && u.guardianId !== g.id)) return notify('That username is taken.');
-    const passwordHash = await hashPassword(password);
-    if (g.user) api.update('users', g.user.id, { username: username.trim(), passwordHash, active: true });
-    else api.add('users', { id: uid('u'), name: g.name, username: username.trim(), role: 'parent', guardianId: g.id, active: true, passwordHash });
+    const v = { id: g.user?.id || uid('u'), name: g.user?.name || g.name, username: username.trim(), role: 'parent', guardianId: g.id, staffId: null, active: true, password };
+    try {
+      await api.request('/api/ops', { method: 'POST', body: { ops: [{ t: 'put', c: 'users', v }] } });
+      await api.reload();
+    } catch (e) { return notify(e.message); }
     api.log(g.user ? 'Reset parent portal password' : 'Created parent portal account', g.name);
     notify(`Portal login for ${g.name}: ${username.trim()} / ${password}`);
     setAccount(null);

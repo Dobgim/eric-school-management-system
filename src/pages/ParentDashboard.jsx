@@ -50,7 +50,7 @@ export default function ParentDashboard() {
         </div>
       )}
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Children in school" value={active.length} icon={Users} hint={kids.length > active.length ? `${kids.length - active.length} past pupil(s)` : undefined} />
         <StatCard label="Paid this term" value={money(paidTerm, cur)} icon={Wallet} tone="green" hint={`of ${money(billedTerm, cur)} billed`} />
         <StatCard label="Total owing" value={money(owing, cur)} icon={Wallet} tone={owing ? 'red' : 'green'} hint={owing ? 'Including any arrears' : 'All fees cleared'} />

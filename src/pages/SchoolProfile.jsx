@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Building2, CalendarDays, Layers, Pencil, Plus, Save, Settings2, Trash2, Upload, Warehouse } from 'lucide-react';
-import { migrate, useStore } from '../lib/store';
+import { useStore } from '../lib/store';
 import { can } from '../lib/permissions';
 import { allTerms, currentTerm } from '../lib/finance';
 import { fmtDate, readFileAsDataURL, today } from '../lib/utils';
@@ -56,7 +56,7 @@ function ProfileTab({ edit }) {
   return (
     <div className="space-y-6">
       {toast}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Pupils enrolled" value={active.length} hint={`${active.filter((s) => db.classes.find((c) => c.id === s.classId)?.level === 'nursery').length} nursery · ${active.filter((s) => db.classes.find((c) => c.id === s.classId)?.level === 'primary').length} primary`} />
         <StatCard label="Staff strength" value={staff.length} tone="purple" hint={`${staff.filter((s) => s.category === 'teaching').length} teaching · ${staff.filter((s) => s.category !== 'teaching').length} non-teaching`} />
         <StatCard label="Classes offered" value={db.classes.length} tone="green" hint={`${db.classes.filter((c) => c.level === 'nursery').length} nursery · ${db.classes.filter((c) => c.level === 'primary').length} primary`} />
@@ -342,10 +342,9 @@ function CalendarTab({ edit }) {
 }
 
 function SettingsTab() {
-  const { db, api, resetDemo } = useStore();
+  const { db, api } = useStore();
   const [cnps, setCnps] = useState(db.settings.cnpsRate);
   const [prefix, setPrefix] = useState(db.school.regPrefix);
-  const [confirmReset, setConfirmReset] = useState(false);
   const [momo, setMomo] = useState(db.settings.momo);
   const setMomoField = (k) => (e) => setMomo({ ...momo, [k]: e.target.value });
   const [toast, notify] = useToast();
@@ -371,7 +370,7 @@ function SettingsTab() {
           <Field label="Account name" className="sm:col-span-2"><Input value={momo.bankAccountName} onChange={setMomoField('bankAccountName')} /></Field>
         </div>
         <div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
-          <b>“Pay now” phone prompts run in demo mode</b> — no money moves. To take real MoMo payments, open a merchant account with a payment provider (e.g. Campay, Notch Pay, Monetbil, or MTN/Orange directly) and connect it through a small server; see <code>src/lib/momo.js</code>.
+          <b>“Pay now” phone prompts run in demo mode</b> — no money moves. To take real MoMo payments, open a merchant account with a payment provider (e.g. Campay, Notch Pay, Monetbil, or MTN/Orange directly) and connect it in <code>server/momo.js</code> and set <code>MOMO_MODE=live</code> on the server.
         </div>
         <Button className="mt-4" icon={Save} onClick={() => { api.setSettings({ momo }); api.log('Updated parent payment accounts'); notify('Payment accounts saved.'); }}>Save accounts</Button>
       </Card>
@@ -391,25 +390,9 @@ function SettingsTab() {
             a.click();
             api.log('Downloaded data backup');
           }}>Download backup (JSON)</Button>
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-            Restore backup
-            <input type="file" accept="application/json" className="hidden" onChange={async (e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              try {
-                const data = JSON.parse(await f.text());
-                if (!data.students || !data.users) throw new Error();
-                migrate(data);
-                api.mutate(() => data);
-                notify('Backup restored.');
-              } catch { notify('That file is not a valid backup.'); }
-            }} />
-          </label>
-          <Button variant="danger" onClick={() => setConfirmReset(true)}>Reset demo data</Button>
         </div>
-        <p className="mt-3 text-xs text-slate-500">Data is stored in this browser. Download a backup regularly.</p>
+        <p className="mt-3 text-xs text-slate-500">Data is stored in the school database on the server. The backup is a JSON copy for your records; to wipe everything and start fresh, run <code>npm run db:reset -- --yes</code> on the server.</p>
       </Card>
-      <Confirm open={confirmReset} onClose={() => setConfirmReset(false)} danger confirmLabel="Reset everything" title="Reset demo data" message="This replaces ALL school data in this browser with the original demo data. Download a backup first if you need it." onConfirm={() => resetDemo().then(() => notify('Demo data restored.'))} />
     </div>
   );
 }

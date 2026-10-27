@@ -42,14 +42,15 @@ function StaffList() {
   const active = db.staff.filter((s) => s.status === 'active');
   const monthly = active.reduce((t, s) => { const g = grade(s.gradeId); return t + (g ? g.basic + g.housing + g.transport : 0); }, 0);
 
-  const save = () => {
+  const save = async () => {
     const s = editing;
     if (!s.firstName.trim() || !s.lastName.trim() || !s.position.trim()) return notify('Name and position are required.');
     if (s.id) {
       api.update('staff', s.id, s);
       api.log('Updated staff record', `${s.firstName} ${s.lastName}`);
     } else {
-      const staffNo = `${db.school.regPrefix}-STF-${pad(api.nextCounter('staff'), 3)}`;
+      let staffNo;
+      try { staffNo = `${db.school.regPrefix}-STF-${pad(await api.nextCounter('staff'), 3)}`; } catch (e) { return notify(e.message); }
       api.add('staff', { ...s, id: uid('st'), staffNo });
       api.log('Added staff', `${s.firstName} ${s.lastName} (${staffNo})`);
     }
@@ -66,7 +67,7 @@ function StaffList() {
   return (
     <>
       {toast}
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Active staff" value={active.length} />
         <StatCard label="Teaching" value={active.filter((s) => s.category === 'teaching').length} tone="green" />
         <StatCard label="Non-teaching" value={active.filter((s) => s.category !== 'teaching').length} tone="purple" />

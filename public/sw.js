@@ -1,6 +1,6 @@
 // Service worker: makes the app installable and lets it open without internet.
 // Bump VERSION when this file's caching rules change; new builds are picked up automatically.
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL = `sis-shell-${VERSION}`;
 const ASSETS = `sis-assets-${VERSION}`;
 const FONTS = `sis-fonts-${VERSION}`;
@@ -27,6 +27,8 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
+  // Live data always comes from the server (the app keeps its own offline copy).
+  if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
 
   // Pages: network first so updates arrive, cached app shell when offline (SPA routes all use index.html).
   if (request.mode === 'navigate') {

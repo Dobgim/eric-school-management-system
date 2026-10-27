@@ -60,7 +60,7 @@ export default function StudentForm() {
     return !Object.keys(e).length;
   };
 
-  const save = () => {
+  const save = async () => {
     if (!validate()) return notify('Please fix the highlighted fields.');
     let guardianIds = s.guardianIds;
     if (guardianMode === 'new') guardianIds = [...guardianIds, api.add('guardians', { ...guardian, id: uid('g') }).id];
@@ -77,7 +77,8 @@ export default function StudentForm() {
       nav(`/students/${existing.id}`);
     } else {
       const year = (s.admissionDate || today()).slice(0, 4);
-      const regNo = `${db.school.regPrefix}/${year}/${pad(api.nextCounter('reg'))}`;
+      let regNo;
+      try { regNo = `${db.school.regPrefix}/${year}/${pad(await api.nextCounter('reg'))}`; } catch (e) { return notify(e.message); }
       const created = api.add('students', {
         ...s, id: uid('p'), regNo, guardianIds, status: 'active', isNew: true, sessionAdmitted: session.id,
         enrollments: { [session.id]: s.classId },

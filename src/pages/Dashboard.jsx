@@ -57,7 +57,7 @@ export default function Dashboard() {
     <>
       <PageHeader title={`Welcome, ${user.name.split(' ')[0]}`} subtitle={`${term.label} · ${fmtDate(term.start)} – ${fmtDate(term.end)}`} />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
         <StatCard label="Total students" value={num(data.active.length)} icon={GraduationCap} hint={`${data.boys} boys · ${data.girls} girls`} />
         <StatCard label="Total staff" value={num(activeStaff.length)} icon={UserRound} tone="purple" hint={`${activeStaff.filter((s) => s.category === 'teaching').length} teaching`} />
         {showMoney && <StatCard label="Fees collected (term)" value={money(data.collected, cur)} icon={Banknote} tone="green" hint={`${data.billed ? Math.round((data.collected / data.billed) * 100) : 0}% of ${money(data.billed, cur)}`} />}

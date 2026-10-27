@@ -23,14 +23,17 @@ export default function PaymentRequests() {
   const kid = (id) => db.students.find((s) => s.id === id);
   const onlineMonth = sum(db.payments.filter((p) => p.channel === 'online' && p.date.slice(0, 7) === thisMonth()), (p) => p.amount);
 
-  const doApprove = () => {
+  const doApprove = async () => {
     const items = approve.items.map((i) => ({ ...i, amount: Math.round(Number(i.amount) || 0) })).filter((i) => i.amount > 0);
     if (!items.length) return notify('Enter the amount actually received.');
-    const created = items.flatMap((i) => recordPayment(db, api, {
+    const created = [];
+    try {
+      for (const i of items) created.push(...await recordPayment(db, api, {
       studentId: i.studentId, amount: i.amount, method: approve.request.method, reference: approve.request.reference,
       date: approve.date, receivedBy: user.id, channel: 'portal', requestId: approve.request.id,
-      note: `Submitted by ${guardianName(approve.request.guardianId)} via parent portal`,
-    }));
+        note: `Submitted by ${guardianName(approve.request.guardianId)} via parent portal`,
+      }));
+    } catch (e) { return notify(e.message); }
     api.update('paymentRequests', approve.request.id, { status: 'approved', reviewedBy: user.id, reviewedAt: new Date().toISOString(), paymentIds: created.map((p) => p.id), approvedAmount: sum(items, (i) => i.amount), reviewNote: approve.note });
     api.notify({
       userIds: [approve.request.userId], kind: 'confirmed', link: '/portal/payments',
@@ -68,7 +71,7 @@ export default function PaymentRequests() {
         subtitle="Check each MoMo / bank transaction against the school's statement, then confirm it to issue receipts."
         actions={user.role === 'superadmin' && <Link to="/school?tab=settings"><Button variant="secondary" icon={Settings2}>Payment accounts</Button></Link>}
       />
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
         <StatCard label="Awaiting verification" value={pending.length} tone={pending.length ? 'amber' : 'green'} hint={money(sum(pending, (r) => r.amount), cur)} />
         <StatCard label="Paid online this month" value={money(onlineMonth, cur)} tone="blue" hint="Phone-prompt payments, receipted automatically" />
         <StatCard label="Rejected (all time)" value={all.filter((r) => r.status === 'rejected').length} tone="red" />

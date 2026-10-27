@@ -65,7 +65,7 @@ export default function Fees() {
           <span className="font-semibold">Review now →</span>
         </Link>
       )}
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Collected today" value={money(sum(todays, (p) => p.amount), cur)} icon={Banknote} tone="green" hint={`${todays.length} payment(s)`} />
         <StatCard label={`Collected · ${term.name}`} value={money(termTotal, cur)} icon={Banknote} />
         <StatCard label="Via Mobile Money" value={money(momo, cur)} tone="amber" hint={`${termTotal ? Math.round((momo / termTotal) * 100) : 0}% of this term`} />
@@ -143,7 +143,7 @@ export function PaymentModal({ open, onClose, onSaved, initialStudent }) {
   const reset = () => { setQ(''); setStudentId(''); setForm({ termId: '', amount: '', method: 'cash', reference: '', date: today(), note: '' }); setSaved(null); setError(''); };
   const close = () => { reset(); onClose(); };
 
-  const save = () => {
+  const save = async () => {
     const amount = Number(form.amount);
     if (!student) return setError('Choose a pupil.');
     if (!amount || amount <= 0) return setError('Enter the amount received.');
@@ -151,7 +151,8 @@ export function PaymentModal({ open, onClose, onSaved, initialStudent }) {
     const dup = form.reference.trim() && db.payments.find((p) => p.reference && p.reference.toLowerCase() === form.reference.trim().toLowerCase());
     if (dup) return setError(`Reference already used on receipt ${dup.receiptNo}.`);
     const t = allTerms(db).find((x) => x.id === termId);
-    const receiptNo = `RCT-${form.date.slice(0, 4)}-${pad(api.nextCounter('receipt'), 5)}`;
+    let receiptNo;
+    try { receiptNo = `RCT-${form.date.slice(0, 4)}-${pad(await api.nextCounter('receipt'), 5)}`; } catch (e) { return setError(e.message); }
     const p = api.add('payments', { id: uid('pay'), receiptNo, studentId: student.id, sessionId: t.sessionId, termId, date: form.date, amount, method: form.method, reference: form.reference.trim(), note: form.note, receivedBy: user.id });
     api.log('Recorded payment', `${receiptNo} — ${money(amount, cur)} — ${fullName(student)} (${methodLabel(form.method)})`);
     setSaved(p);

@@ -7,18 +7,8 @@ import { Logo } from '../components/Layout';
 import { Button, Field, Input } from '../components/ui';
 import { InstallButton } from '../components/InstallApp';
 
-const DEMO = {
-  staff: [
-    ['proprietor', 'admin123', 'Super Admin / Proprietor'],
-    ['secretary', 'secretary123', 'Admin / Secretary'],
-    ['bursar', 'bursar123', 'Bursar / Accountant'],
-    ['teacher', 'teacher123', 'Teacher (Class 3)'],
-  ],
-  parent: [['parent', 'parent123', 'Parent with 2+ children']],
-};
-
 export default function Login() {
-  const { db, login } = useStore();
+  const { school, login } = useStore();
   const nav = useNavigate();
   const [portal, setPortal] = useState('staff');
   const [form, setForm] = useState({ username: '', password: '' });
@@ -42,24 +32,24 @@ export default function Login() {
         <div className="absolute -top-24 -right-24 size-96 rounded-full bg-brand-800/60" />
         <div className="absolute -bottom-32 -left-16 size-96 rounded-full bg-accent-500/15" />
         <div className="relative flex items-center gap-4">
-          <Logo school={db.school} size="lg" />
+          <Logo school={school} size="lg" />
           <div>
-            <p className="text-xl font-extrabold">{db.school.name}</p>
-            <p className="text-brand-300 italic">“{db.school.motto}”</p>
+            <p className="text-xl font-extrabold">{school.name}</p>
+            {school.motto && <p className="text-brand-300 italic">“{school.motto}”</p>}
           </div>
         </div>
         <div className="relative max-w-md">
           <h1 className="text-4xl leading-tight font-extrabold">One place for pupils, fees, staff and parents.</h1>
           <p className="mt-4 text-brand-200">Admissions, school fees with MTN &amp; Orange Mobile Money, payroll, uniforms and materials, reports for management and PTA meetings, and a portal for parents.</p>
         </div>
-        <p className="relative text-sm text-brand-300">{db.school.address} · {db.school.phone}</p>
+        <p className="relative text-sm text-brand-300">{[school.address, school.phone].filter(Boolean).join(' · ')}</p>
       </div>
 
       <div className="flex items-center justify-center bg-white px-4 py-10 sm:px-8">
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <Logo school={db.school} />
-            <p className="font-extrabold text-slate-900">{db.school.name}</p>
+            <Logo school={school} />
+            <p className="font-extrabold text-slate-900">{school.name}</p>
           </div>
           <h2 className="text-2xl font-extrabold text-slate-900">Sign in</h2>
           <p className="mt-1 text-sm text-slate-500">Use the account given to you by the school.</p>
@@ -90,20 +80,7 @@ export default function Login() {
             <span>Parents: get the app on your phone</span>
             <InstallButton size="sm" />
           </div>
-
-          <div className="mt-8 rounded-xl border border-dashed border-slate-300 p-4">
-            <p className="text-xs font-bold tracking-wide text-slate-500 uppercase">Demo accounts</p>
-            <ul className="mt-2 space-y-1.5">
-              {DEMO[portal].map(([u, p, role]) => (
-                <li key={u}>
-                  <button type="button" onClick={() => setForm({ username: u, password: p })} className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-50">
-                    <span className="font-semibold text-slate-700">{role}</span>
-                    <span className="font-mono text-xs text-slate-500">{u} / {p}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <p className="mt-8 text-center text-xs text-slate-500">Forgot your password? Ask the school office to reset it.</p>
         </div>
       </div>
     </div>

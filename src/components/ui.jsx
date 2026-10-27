@@ -109,11 +109,11 @@ export const FeeBadge = ({ state }) => <Badge tone={FEE_STATE[state][0]}>{FEE_ST
 export function StatCard({ label, value, icon: Icon, tone = 'blue', hint }) {
   const ring = { blue: 'bg-brand-50 text-brand-700', green: 'bg-emerald-50 text-emerald-700', amber: 'bg-amber-50 text-amber-700', red: 'bg-rose-50 text-rose-700', purple: 'bg-violet-50 text-violet-700' }[tone];
   return (
-    <div className="card flex items-start gap-4 p-5">
-      {Icon && <div className={cx('grid size-11 shrink-0 place-items-center rounded-xl', ring)}><Icon className="size-5" /></div>}
+    <div className="card flex min-w-0 items-start gap-4 p-4 sm:p-5">
+      {Icon && <div className={cx('hidden size-11 shrink-0 place-items-center rounded-xl sm:grid', ring)}><Icon className="size-5" /></div>}
       <div className="min-w-0">
-        <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">{label}</p>
-        <p className="mt-1 text-lg leading-tight font-extrabold break-words text-slate-900 tabular-nums 2xl:text-xl">{value}</p>
+        <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase sm:text-xs">{label}</p>
+        <p className="mt-1 text-base sm:text-lg leading-tight font-extrabold break-words text-slate-900 tabular-nums 2xl:text-xl">{value}</p>
         {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
       </div>
     </div>
@@ -195,9 +195,42 @@ export function DataTable({ columns, rows, pageSize = 15, onRowClick, empty, foo
   useEffect(() => { if (page >= pages) setPage(0); }, [pages, page]);
   const slice = rows.slice(page * pageSize, page * pageSize + pageSize);
   if (!rows.length) return empty || <Empty />;
+
+  // Phones: each row becomes a card — first column as the title, labelled fields below, actions at the bottom.
+  const cell = (c, r) => {
+    const v = c.render ? c.render(r) : r[c.key];
+    return v === null || v === undefined || v === '' ? '—' : v;
+  };
+  const select = columns.find((c) => c.key === 'sel');
+  const [title, ...rest] = columns.filter((c) => c !== select);
+  const fields = rest.filter((c) => typeof c.label === 'string' && c.label);
+  const actions = rest.filter((c) => !(typeof c.label === 'string' && c.label));
+  const stop = (e) => e.stopPropagation();
+
   return (
     <div>
-      <div className="overflow-x-auto">
+      <ul className="divide-y divide-slate-100 md:hidden">
+        {slice.map((r, i) => (
+          <li key={r.id || i} onClick={onRowClick ? () => onRowClick(r) : undefined} className={cx('px-4 py-3', onRowClick && 'cursor-pointer active:bg-slate-50')}>
+            <div className="flex items-start gap-3">
+              {select && <div onClick={stop} className="pt-0.5">{cell(select, r)}</div>}
+              <div className="min-w-0 flex-1 font-semibold text-slate-900">{cell(title, r)}</div>
+            </div>
+            {fields.length > 0 && (
+              <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                {fields.map((c) => (
+                  <div key={c.key} className="min-w-0">
+                    <dt className="text-[11px] font-semibold tracking-wide text-slate-400 uppercase">{c.label}</dt>
+                    <dd className="break-words text-slate-700">{cell(c, r)}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            {actions.length > 0 && <div onClick={stop} className="mt-2 flex flex-wrap justify-end gap-1">{actions.map((c) => <div key={c.key}>{c.render ? c.render(r) : null}</div>)}</div>}
+          </li>
+        ))}
+      </ul>
+      <div className="hidden overflow-x-auto md:block">
         <table className="table-base">
           <thead>
             <tr>{columns.map((c) => <th key={c.key} className={c.align === 'right' ? 'text-right' : ''}>{c.label}</th>)}</tr>

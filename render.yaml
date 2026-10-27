@@ -1,0 +1,20 @@
+# One-click deploy on Render (render.com → New → Blueprint → pick this repo).
+services:
+  - type: web
+    name: school-information-system
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        sync: false # paste your Neon / Supabase / Render Postgres connection string
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: MOMO_MODE
+        value: demo

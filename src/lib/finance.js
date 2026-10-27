@@ -1,4 +1,4 @@
-import { FEE_TYPES, sum } from './utils';
+import { FEE_TYPES, sum } from './utils.js';
 
 export const allTerms = (db) =>
   db.sessions.flatMap((s) => s.terms.map((t) => ({ ...t, sessionId: s.id, sessionName: s.name, label: `${t.name} ${s.name}` }))).sort((a, b) => a.start.localeCompare(b.start));

@@ -57,7 +57,7 @@ export default function Debtors() {
   return (
     <>
       <PageHeader title="Debtors & Arrears" subtitle={`Pupils with unpaid fees for ${term.label} or earlier terms.`} />
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Debtors" value={rows.length} tone="red" hint={`of ${db.students.filter((s) => s.status === 'active').length} active pupils`} />
         <StatCard label="Current term balances" value={money(totals.balance, cur)} tone="amber" />
         <StatCard label="Arrears" value={money(totals.arrears, cur)} tone="red" hint={`${rows.filter((r) => r.arrears).length} pupils`} />

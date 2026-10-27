@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { KeyRound, Pencil, ShieldCheck, UserPlus } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { exportExcel, exportTablePDF } from '../lib/exporters';
-import { ROLES, fmtDateTime, hashPassword, uid } from '../lib/utils';
+import { ROLES, fmtDateTime, uid } from '../lib/utils';
 import { Avatar, Badge, Button, Card, DataTable, ExportButtons, Field, Input, Modal, PageHeader, SearchInput, Select, Tabs, useToast } from '../components/ui';
 
 const ROLE_TONE = { superadmin: 'red', admin: 'blue', bursar: 'amber', teacher: 'green', parent: 'purple' };
@@ -45,9 +45,11 @@ function UserList() {
     if (!f.id && (f.password || '').length < 6) return notify('Password must be at least 6 characters.');
     if (f.id === me.id && (f.role !== 'superadmin' || !f.active)) return notify('You cannot demote or deactivate your own account.');
     const patch = { name: f.name.trim(), username: f.username.trim(), role: f.role, active: f.active, staffId: f.staffId || null, guardianId: f.guardianId || null };
-    if (f.password) patch.passwordHash = await hashPassword(f.password);
-    if (f.id) api.update('users', f.id, patch);
-    else api.add('users', { ...patch, id: uid('u') });
+    // Sent straight to the server, which hashes the password; it is never kept in the browser.
+    try {
+      await api.request('/api/ops', { method: 'POST', body: { ops: [{ t: 'put', c: 'users', v: { ...patch, id: f.id || uid('u'), ...(f.password ? { password: f.password } : {}) } }] } });
+      await api.reload();
+    } catch (e) { return notify(e.message); }
     api.log(f.id ? 'Updated user' : 'Created user', `${patch.username} (${ROLES[patch.role]})`);
     notify(f.password ? `Saved. Login: ${patch.username} / ${f.password}` : 'User saved.');
     setForm(null);
