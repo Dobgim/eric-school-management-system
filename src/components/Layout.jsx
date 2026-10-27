@@ -33,12 +33,14 @@ const NAV = [
   ] },
   { group: 'My family', items: [
     { to: '/portal/children', label: 'My Children', icon: Users, perm: 'portal' },
+    { to: '/portal/admissions', label: 'Register children', icon: UserPlus, perm: 'portal' },
     { to: '/portal/pay', label: 'Pay Fees', icon: Smartphone, perm: 'portal' },
     { to: '/portal/payments', label: 'Payments & Receipts', icon: Receipt, perm: 'portal' },
     { to: '/portal/news', label: 'News & Calendar', icon: Megaphone, perm: 'portal' },
   ] },
   { group: 'Academics', items: [
     { to: '/students', label: 'Students', icon: Users, perm: 'students.view' },
+    { to: '/admissions', label: 'Admission applications', icon: ClipboardList, perm: 'students.edit', badge: (db) => db.admissionApplications.filter((a) => a.status === 'pending').length },
     { to: '/guardians', label: 'Parents & Guardians', icon: Contact, perm: 'guardians.edit' },
     { to: '/academics', label: 'Term Results', icon: BookOpenCheck, perm: 'academics.edit' },
     { to: '/promotion', label: 'Promotion & Exits', icon: ArrowUpCircle, perm: 'promotion' },

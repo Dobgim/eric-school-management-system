@@ -30,6 +30,8 @@ import Account from './pages/Account';
 import Signup from './pages/Signup';
 import Signups from './pages/Signups';
 import MyWork from './pages/MyWork';
+import ParentAdmissions from './pages/ParentAdmissions';
+import Admissions from './pages/Admissions';
 
 function Guard({ perm, children }) {
   const { user } = useStore();
@@ -77,6 +79,8 @@ export default function App() {
         <Route path="portal/pay" element={g('portal', <PayFees />)} />
         <Route path="portal/payments" element={g('portal', <ParentPayments />)} />
         <Route path="portal/news" element={g('portal', <ParentNews />)} />
+        <Route path="portal/admissions" element={g('portal', <ParentAdmissions />)} />
+        <Route path="admissions" element={g('students.edit', <Admissions />)} />
         <Route path="account" element={<Account />} />
         <Route path="me" element={g('me', <MyWork />)} />
         <Route path="signups" element={g('signups', <Signups />)} />

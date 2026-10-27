@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarDays, Clock, Download, GraduationCap, Megaphone, Smartphone, Users, Wallet } from 'lucide-react';
+import { ArrowRight, CalendarDays, Clock, Download, GraduationCap, Megaphone, Smartphone, UserPlus, Users, Wallet } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { currentTerm, feeStatus, pendingFor } from '../lib/finance';
 import { downloadReceipt } from '../lib/documents';
@@ -32,6 +32,7 @@ export default function ParentDashboard() {
   const requests = db.paymentRequests.filter((r) => r.guardianId === user.guardianId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 4);
   const news = visibleAnnouncements(db, user).slice(0, 3);
   const events = db.calendarEvents.filter((e) => (e.endDate || e.date) >= today()).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 4);
+  const pendingApps = db.admissionApplications.filter((a) => a.status === 'pending').length;
   const lastResult = (id) => db.academicRecords.filter((r) => r.studentId === id).sort((a, b) => b.termId.localeCompare(a.termId))[0];
 
   return (
@@ -57,8 +58,12 @@ export default function ParentDashboard() {
         <StatCard label="Awaiting verification" value={money(pending, cur)} icon={Clock} tone="amber" hint={`${db.paymentRequests.filter((r) => r.guardianId === user.guardianId && r.status === 'pending').length} submission(s)`} />
       </div>
 
-      <h2 className="mb-3 text-lg font-bold text-slate-900">My children</h2>
-      {!kids.length ? <Card><Empty title="No children linked to your account" message="Contact the school office to link your children." /></Card> : (
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-bold text-slate-900">My children</h2>
+        <Link to="/portal/admissions"><Button size="sm" variant="secondary" icon={UserPlus}>Register {kids.length ? 'another' : 'a'} child</Button></Link>
+      </div>
+      {pendingApps > 0 && <Link to="/portal/admissions" className="mb-4 block rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100"><b>{pendingApps} admission application{pendingApps > 1 ? 's' : ''}</b> under review by the school.</Link>}
+      {!kids.length ? <Card><Empty title="No children at the school yet" message="Register your children for admission — you can add several at once. They appear here once the school accepts them." action={<Link to="/portal/admissions"><Button icon={UserPlus}>Register children</Button></Link>} /></Card> : (
         <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {kids.map((k) => {
             const cls = db.classes.find((c) => c.id === k.classId);

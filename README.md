@@ -92,25 +92,44 @@ Tables ([server/schema.sql](server/schema.sql)):
 
 ## Accounts and sign-up
 
-People can create their own account from the sign-in page (**Parent sign-up** / **Staff sign-up**). The office can also create accounts directly: staff under *Users & Activity*, parents from *Parents & Guardians* → **Portal**.
+### Parents
 
-**Parents** give their name, phone number (which becomes their username), a password, and their child's **registration number and date of birth**.
+Parents create their own account from the sign-in page with **Parent sign-up**. They choose one of two paths.
 
-- If those details match a pupil, and the phone number matches the parent recorded for that pupil, the account **opens immediately**. It's linked to that parent record, so it shows all their children.
-- Otherwise the request goes to **Sign-up requests**. The secretary or proprietor then links it to an existing parent record, or picks the pupil(s) it may see.
+**"My child already attends"**
 
-**Staff** (teaching, secretariat, bursary or other staff) give their name, phone, job title, department, username and password.
+The parent gives their child's **registration number and date of birth**.
 
-- The account stays **pending until the super admin approves it**. The super admin sets the real role and links or creates the staff record.
-- Asking for a department does not grant access. Nobody can give themselves bursar or admin rights.
+- If those match a pupil, and the parent's phone number matches the parent recorded for that pupil, the account **opens immediately**. It shows all their children.
+- Otherwise the request waits on **Sign-up requests**. The secretary or proprietor confirms which pupil(s) are theirs.
 
-**Rules that apply to everyone:**
+**"Register my child(ren)"** (new families)
+
+- The account opens immediately, with no pupils attached.
+- The parent goes straight to **Register children**, where they add **as many children as they need in one go**. For each child they give the name, sex, date of birth, the class applying for, previous school, health notes, and optionally a birth certificate.
+- Each child becomes an **admission application** on the office's *Admission applications* page, with a badge and a notification.
+- The office **admits** the child or **declines** with a reason. Admitting can put the child in a different class from the one requested; it creates the pupil with a registration number, linked to the parent.
+- The parent is notified, and admitted children appear on their dashboard.
+- Existing parents can register a sibling the same way (*Register another child*).
+
+A phone number already on the school's records can't be used for a new-family account. That parent must use the first path instead.
+
+### Staff: by invitation only
+
+Nobody can sign up as staff on their own.
+
+1. The super admin opens **Users & Activity → Staff invitations** and creates an invitation. It records the **role** (teacher, secretary, bursar or other staff), optionally the person's name and job title, and optionally an existing staff record.
+2. The person receives a one-time **code** (e.g. `K7QM-29XP`) and a link, to share by WhatsApp or as copied text. Invitations last 1–30 days and can be cancelled while unused.
+3. They choose **Staff: I have an invitation** on the sign-in page (or open the link) and set their own username and password. They get **exactly the role in the invitation**, and their staff record is linked or created automatically.
+
+Codes that are used, expired, cancelled or made up are refused, by the page and by the server.
+
+### Rules that apply to everyone
 
 - Pending and rejected accounts can't sign in. A rejected person sees the reason that was given.
-- Each new sign-up notifies the people who can approve it, and the sidebar shows a badge with the number waiting.
 - One phone number can't be used for two parent accounts.
-- A single connection is limited to 30 sign-ups per hour.
-- Approval logic is in [server/signup.js](server/signup.js).
+- A single connection is limited to 30 sign-ups per hour, and invitation look-ups are rate-limited too.
+- The logic is in [server/signup.js](server/signup.js), and the checks on what parents may submit are in [server/data.js](server/data.js).
 
 ## What's included
 
@@ -128,7 +147,8 @@ People can create their own account from the sign-in page (**Parent sign-up** / 
 | Uniforms, books and materials: stock, sales to pupils, low-stock alerts, valuation | Uniforms & Materials |
 | Dashboard and 9 reports exportable to PDF and Excel | Dashboard, Reports |
 | Parent dashboard, online fee payment, receipts and statement, news | Parent portal |
-| Parent and staff self sign-up with school approval; staff payslips | Sign-up requests, My Payslips |
+| Parent sign-up; parents registering several children at once; office admits or declines | Register children, Admission applications |
+| Staff accounts by one-time invitation only; staff payslips | Users & Activity → Staff invitations, My Payslips |
 | Live notifications on every signed-in device | Bell in the header |
 
 ## Parent payments
@@ -182,7 +202,7 @@ server/
   db.js        PostgreSQL (DATABASE_URL) or local PGlite
   auth.js      password hashing, session cookie
   momo.js      Mobile Money collection (demo / live)
-  signup.js    parent and staff self sign-up, approval and rejection
+  signup.js    parent sign-up, staff invitations, admission decisions
   setup.js     clean first-run data · reset.js wipes and recreates it
   schema.sql
 src/

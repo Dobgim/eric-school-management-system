@@ -7,6 +7,7 @@ export const COLLECTIONS = [
   'students', 'guardians', 'classes', 'facilities', 'sessions', 'calendarEvents', 'categories', 'feeItems',
   'payments', 'staff', 'salaryScales', 'salaryAdjustments', 'payrollRuns', 'inventory', 'stockMovements', 'sales',
   'academicRecords', 'promotionRecommendations', 'announcements', 'activityLog', 'paymentRequests', 'notifications',
+  'admissionApplications', 'invites',
 ];
 
 export const newId = (p = '') => p + Date.now().toString(36) + randomBytes(3).toString('hex');
@@ -60,6 +61,7 @@ export function viewFor(user, all) {
       sales: all.sales.filter((s) => kids.has(s.studentId)),
       academicRecords: all.academicRecords.filter((r) => kids.has(r.studentId)),
       paymentRequests: all.paymentRequests.filter((r) => r.guardianId === user.guardianId),
+      admissionApplications: all.admissionApplications.filter((a) => a.guardianId && a.guardianId === user.guardianId),
       announcements: all.announcements.filter((a) => a.audience === 'all' || a.audience === 'parents'),
       staff: all.staff.filter((s) => teacherIds.has(s.id)).map(staffCard),
       users: minimalUsers(all),
@@ -107,6 +109,9 @@ export function viewFor(user, all) {
   // Office staff. The secretary does not see payroll; only the super admin sees account details.
   const view = { ...all, ...base, notifications: base.notifications };
   if (user.role === 'admin') { view.payrollRuns = ownPay(); view.salaryAdjustments = []; }
+  if (user.role === 'bursar') view.admissionApplications = [];
+  // Invitation codes are secrets: only the super admin sees them.
+  if (user.role !== 'superadmin') view.invites = [];
   if (user.role !== 'superadmin') view.users = user.role === 'admin' ? all.users.filter((u) => u.role === 'parent').concat(minimalUsers(all).filter((u) => u.role !== 'parent')) : minimalUsers(all);
   return view;
 }
@@ -214,7 +219,11 @@ export async function applyOps(q, user, ops) {
         });
         continue;
       }
-      throw new Forbidden('Parents can only submit payments for verification.');
+      if (c === 'admissionApplications' && t === 'put' && !before) {
+        await addApplication(q, user, all, after, putRecord, now);
+        continue;
+      }
+      throw new Forbidden('Parents can only submit payments for verification or apply to register children.');
     } else {
       throw new Forbidden('Not allowed.');
     }
@@ -224,6 +233,38 @@ export async function applyOps(q, user, ops) {
     else throw new Invalid(`Unknown operation ${t}`);
   }
   return { changed };
+}
+
+const cleanText = (v, max = 120) => String(v ?? '').trim().slice(0, max);
+
+/** A parent applies to register one child. Everything is re-built here from allowed fields only. */
+async function addApplication(q, user, all, v, putRecord, now) {
+  if (!user.guardianId) throw new Forbidden('Your account is not linked to a parent record. Contact the school.');
+  const pending = all.admissionApplications.filter((a) => a.guardianId === user.guardianId && a.status === 'pending').length;
+  if (pending >= 15) throw new Invalid('You already have 15 applications waiting. Please wait for the school to review them.');
+  const cls = all.classes.find((c) => c.id === v.classId);
+  const firstName = cleanText(v.firstName, 60);
+  const lastName = cleanText(v.lastName, 60);
+  if (!firstName || !lastName) throw new Invalid("Enter each child's first name and surname.");
+  if (!['M', 'F'].includes(v.gender)) throw new Invalid("Choose each child's sex.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v.dob || '') || v.dob > now.slice(0, 10)) throw new Invalid(`Enter a valid date of birth for ${firstName}.`);
+  if (!cls) throw new Invalid(`Choose the class ${firstName} is applying for.`);
+  const documents = (Array.isArray(v.documents) ? v.documents : []).slice(0, 3)
+    .filter((d) => typeof d?.dataUrl === 'string' && /^data:(image\/|application\/pdf)/.test(d.dataUrl) && d.dataUrl.length < 2_200_000)
+    .map((d) => ({ id: newId('doc'), name: cleanText(d.name, 60) || 'Document', fileName: cleanText(d.fileName, 120), size: Number(d.size) || 0, uploadedAt: now, verified: false, dataUrl: d.dataUrl }));
+  const app = {
+    id: v.id, ref: `APP-${String(await nextCounter(q, 'application')).padStart(5, '0')}`, status: 'pending',
+    guardianId: user.guardianId, userId: user.id, createdAt: now,
+    firstName, otherNames: cleanText(v.otherNames, 60), lastName, gender: v.gender, dob: v.dob,
+    placeOfBirth: cleanText(v.placeOfBirth, 60), classId: cls.id, previousSchool: cleanText(v.previousSchool, 120),
+    allergies: cleanText(v.allergies, 120), medicalNotes: cleanText(v.medicalNotes, 300), documents,
+  };
+  await putRecord('admissionApplications', app);
+  await putRecord('notifications', {
+    id: newId('nt'), roles: ['superadmin', 'admin'], userIds: [], kind: 'verify', link: '/admissions', readBy: [], createdAt: now,
+    title: `Admission application: ${firstName} ${lastName} for ${cls.name}`,
+    body: `From ${user.name} · ${app.ref}`,
+  });
 }
 
 async function writeUser(q, user, all, op) {

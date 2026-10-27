@@ -4,6 +4,7 @@ import { KeyRound, Pencil, ShieldCheck, UserPlus } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { exportExcel, exportTablePDF } from '../lib/exporters';
 import { ROLES, fmtDateTime, uid } from '../lib/utils';
+import StaffInvites from './StaffInvites';
 import { Avatar, Badge, Button, Card, DataTable, ExportButtons, Field, Input, Modal, PageHeader, SearchInput, Select, Tabs, useToast } from '../components/ui';
 
 const ROLE_TONE = { superadmin: 'red', admin: 'blue', bursar: 'amber', teacher: 'green', parent: 'purple' };
@@ -20,8 +21,9 @@ export default function Users() {
   return (
     <>
       <PageHeader title="Users & Activity" subtitle="Role-based accounts and an audit trail of everything done in the system." />
-      <Tabs tabs={[{ id: 'users', label: 'User accounts', icon: ShieldCheck }, { id: 'log', label: 'Activity log' }, { id: 'roles', label: 'Roles & access' }]} value={tab} onChange={setTab} />
+      <Tabs tabs={[{ id: 'users', label: 'User accounts', icon: ShieldCheck }, { id: 'invites', label: 'Staff invitations', icon: UserPlus }, { id: 'log', label: 'Activity log' }, { id: 'roles', label: 'Roles & access' }]} value={tab} onChange={setTab} />
       {tab === 'users' && <UserList />}
+      {tab === 'invites' && <StaffInvites />}
       {tab === 'log' && <ActivityLog />}
       {tab === 'roles' && (
         <div className="grid gap-4 md:grid-cols-2">

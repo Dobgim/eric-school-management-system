@@ -84,7 +84,7 @@ export default function Login() {
             <p className="text-sm text-slate-600">New here?</p>
             <div className="mt-2 flex flex-wrap justify-center gap-2">
               <Link to="/signup"><Button variant="secondary" size="sm">Parent sign-up</Button></Link>
-              <Link to="/signup?as=staff"><Button variant="secondary" size="sm">Staff sign-up</Button></Link>
+              <Link to="/signup?as=staff"><Button variant="secondary" size="sm">Staff: I have an invitation</Button></Link>
             </div>
           </div>
           <p className="mt-6 text-center text-xs text-slate-500">Forgot your password? Ask the school office to reset it.</p>

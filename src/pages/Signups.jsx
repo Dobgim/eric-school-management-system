@@ -63,7 +63,7 @@ export default function Signups() {
   return (
     <>
       {toast}
-      <PageHeader title="Sign-up requests" subtitle={user.role === 'superadmin' ? 'Parents and staff who created an account and are waiting for access.' : 'Parents who created an account and are waiting for you to confirm their children.'} />
+      <PageHeader title="Sign-up requests" subtitle="Parents whose details couldn’t be matched to a pupil automatically. Confirm which children are theirs. (Staff join with an invitation instead — see Users & Activity.)" />
       <Tabs tabs={[{ id: 'pending', label: 'Waiting', count: pendingCount }, { id: 'done', label: 'Handled' }]} value={tab} onChange={setTab} />
       <Card bodyClass="">
         <DataTable
