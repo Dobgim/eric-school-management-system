@@ -4,7 +4,7 @@ import { Download, Eye, FileUp, History, Pencil, Receipt, ShieldCheck, ShoppingB
 import { useStore } from '../lib/store';
 import { can } from '../lib/permissions';
 import { allTerms, billLines, currentTerm, feeStatus, termPaid, termsUpTo } from '../lib/finance';
-import { downloadReceipt } from '../lib/documents';
+import { downloadReceipt, downloadReportCards } from '../lib/documents';
 import { OPTIONAL_DOCS, REQUIRED_DOCS, STUDENT_STATUS, age, feeTypeLabel, fmtDate, fullName, methodLabel, money, readFileAsDataURL, uid } from '../lib/utils';
 import { Avatar, Badge, Button, Card, DataTable, Empty, FeeBadge, Field, Info, PageHeader, Select, StatCard, Tabs, useToast } from '../components/ui';
 
@@ -181,7 +181,7 @@ function Academic({ s }) {
     <Card title="Term results" bodyClass="">
       <DataTable
         rows={records}
-        empty={<Empty title="No results recorded yet" message="Class teachers enter term averages from Term Results." />}
+        empty={<Empty title="No results recorded yet" message="Class teachers enter marks by subject under Term Results." />}
         columns={[
           { key: 'term', label: 'Term', render: (r) => allTerms(db).find((t) => t.id === r.termId)?.label },
           { key: 'class', label: 'Class', render: (r) => db.classes.find((c) => c.id === r.classId)?.name },
@@ -190,6 +190,7 @@ function Academic({ s }) {
           { key: 'attendance', label: 'Attendance', align: 'right', render: (r) => (r.daysOpen ? `${r.attendance} / ${r.daysOpen}` : '—') },
           { key: 'conduct', label: 'Conduct' },
           { key: 'remark', label: "Teacher's remark", className: 'max-w-sm text-slate-600' },
+          { key: 'card', label: '', align: 'right', render: (r) => <Button size="sm" variant="ghost" icon={Download} onClick={() => downloadReportCards(db, [r], `Report card - ${fullName(s)} - ${allTerms(db).find((t) => t.id === r.termId)?.label}`)}>Report card</Button> },
         ]}
       />
     </Card>

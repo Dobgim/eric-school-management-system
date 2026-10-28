@@ -146,7 +146,10 @@ Codes that are used, expired, cancelled or made up are refused, by the page and 
 | Admission with automatic registration numbers, biodata, parents, document upload and verification | Students → Admit pupil |
 | Search and filters, bulk class allocation, pupil profile (fees, results, documents, purchases, history) | Students |
 | Promotion, repeat and graduation per class; transfers, withdrawals, re-admission | Promotion & Exits |
-| Term averages, conduct, attendance and automatic class positions | Term Results / My Class |
+| Marks per subject with coefficients; weighted averages, positions, class average, highest and lowest; printable report cards (one pupil or the whole class) that parents can download | Results & report cards / My Class |
+| Daily attendance register (present / absent / late); parents of absent pupils are notified on their phone at once; term summary per pupil; days present filled into report cards | Daily attendance |
+| School spending (rent, electricity, materials…) and money in against money out per month, PDF/Excel | Expenses & cash flow |
+| Full backup of all school data (super admin), with a monthly reminder | School Profile → Settings |
 | Fee structure per class, term and fee type, plus category discounts | Fee Structure |
 | Payments by cash, MTN MoMo, Orange Money or bank transfer; PDF receipts | Fee Collection |
 | Outstanding balances and arrears, with a WhatsApp reminder link | Debtors |

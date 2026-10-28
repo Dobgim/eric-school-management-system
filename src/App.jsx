@@ -36,6 +36,8 @@ import ForgotPassword from './pages/ForgotPassword';
 import SchoolFees from './pages/SchoolFees';
 import Teachers from './pages/Teachers';
 import FeeStatus from './pages/FeeStatus';
+import Attendance from './pages/Attendance';
+import Expenses from './pages/Expenses';
 
 function Guard({ perm, children }) {
   const { user } = useStore();
@@ -67,6 +69,8 @@ export default function App() {
         <Route path="students/:id/edit" element={g('students.edit', <StudentForm />)} />
         <Route path="guardians" element={g('guardians.edit', <Guardians />)} />
         <Route path="academics" element={g('academics.edit', <Academics />)} />
+        <Route path="attendance" element={g(['myclass', 'students.edit'], <Attendance />)} />
+        <Route path="expenses" element={g('payroll', <Expenses />)} />
         <Route path="promotion" element={g('promotion', <Promotion />)} />
         <Route path="fees" element={g('fees.view', <Fees />)} />
         <Route path="fees/online" element={g('fees.collect', <PaymentRequests />)} />

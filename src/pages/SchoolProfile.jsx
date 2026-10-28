@@ -4,7 +4,7 @@ import { Building2, CalendarDays, Layers, Pencil, Plus, Save, Settings2, Trash2,
 import { useStore } from '../lib/store';
 import { can } from '../lib/permissions';
 import { allTerms, currentTerm } from '../lib/finance';
-import { fmtDate, readFileAsDataURL, today } from '../lib/utils';
+import { fmtDate, fmtDateTime, readFileAsDataURL } from '../lib/utils';
 import { Logo } from '../components/Layout';
 import { Badge, Button, Card, Confirm, DataTable, Field, Info, Input, Modal, PageHeader, Select, StatCard, Tabs, Textarea, useToast } from '../components/ui';
 import PaymentAccount from '../components/PaymentAccount';
@@ -343,7 +343,7 @@ function CalendarTab({ edit }) {
 }
 
 function SettingsTab() {
-  const { db, api } = useStore();
+  const { db, api, user } = useStore();
   const [cnps, setCnps] = useState(db.settings.cnpsRate);
   const [prefix, setPrefix] = useState(db.school.regPrefix);
   const [momo, setMomo] = useState(db.settings.momo);
@@ -380,15 +380,17 @@ function SettingsTab() {
           <Info label="Payroll runs">{db.payrollRuns.length}</Info>
           <Info label="Activity log entries">{db.activityLog.length}</Info>
         </dl>
-        <div className="mt-5 flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => {
-            const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `sis-backup-${today()}.json`;
-            a.click();
-            api.log('Downloaded data backup');
-          }}>Download backup (JSON)</Button>
+        {user.role === 'superadmin' && (() => {
+          const last = db.activityLog.find((l) => /backup/i.test(l.action));
+          const stale = !last || Date.now() - new Date(last.at).getTime() > 30 * 24 * 3600 * 1000;
+          return (
+            <p className={`mt-5 rounded-md px-3 py-2 text-sm ${stale ? 'bg-amber-50 text-amber-900' : 'bg-slate-50 text-slate-600'}`}>
+              {last ? `Last backup: ${fmtDateTime(last.at)}.` : 'No backup downloaded yet.'} Download one every month and keep it somewhere safe (a flash drive, Google Drive or email). It contains every pupil, payment, result and record; passwords and payment keys are never included.
+            </p>
+          );
+        })()}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {user.role === 'superadmin' && <Button variant="secondary" onClick={() => { window.location.href = '/api/backup'; setTimeout(() => api.reload(), 2500); }}>Download full backup</Button>}
         </div>
         <p className="mt-3 text-xs text-slate-500">Data is stored in the school database on the server. The backup is a JSON copy for your records; to wipe everything and start fresh, run <code>npm run db:reset -- --yes</code> on the server.</p>
       </Card>

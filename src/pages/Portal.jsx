@@ -1,8 +1,8 @@
 import { Link, useSearchParams } from 'react-router-dom';
-import { Download, GraduationCap, ShoppingBag, Smartphone, Wallet } from 'lucide-react';
+import { CalendarCheck, Download, GraduationCap, ShoppingBag, Smartphone, Wallet } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { allTerms, billLines, feeStatus, termPaid, termsUpTo } from '../lib/finance';
-import { downloadReceipt } from '../lib/documents';
+import { allTerms, billLines, currentTerm, feeStatus, termPaid, termsUpTo } from '../lib/finance';
+import { downloadReceipt, downloadReportCards } from '../lib/documents';
 import { age, feeTypeLabel, fmtDate, fullName, methodLabel, money, today } from '../lib/utils';
 import { Avatar, Badge, Button, Card, DataTable, Empty, FeeBadge, Info, PageHeader, Tabs } from '../components/ui';
 import { Progress } from '../components/Charts';
@@ -41,11 +41,12 @@ export default function Portal() {
       )}
       {!child ? <Empty title="No children linked to your account" message="Contact the school office." /> : (
         <>
-          <Tabs tabs={[{ id: 'overview', label: 'Profile' }, { id: 'fees', label: 'Fees & receipts', icon: Wallet }, { id: 'purchases', label: 'Uniforms & materials', icon: ShoppingBag }, { id: 'results', label: 'Results', icon: GraduationCap }]} value={tab} onChange={setTab} />
+          <Tabs tabs={[{ id: 'overview', label: 'Profile' }, { id: 'fees', label: 'Fees & receipts', icon: Wallet }, { id: 'purchases', label: 'Uniforms & materials', icon: ShoppingBag }, { id: 'results', label: 'Results', icon: GraduationCap }, { id: 'attendance', label: 'Attendance', icon: CalendarCheck }]} value={tab} onChange={setTab} />
           {tab === 'overview' && <Overview child={child} />}
           {tab === 'fees' && <Fees child={child} />}
           {tab === 'purchases' && <Purchases child={child} />}
           {tab === 'results' && <Results child={child} />}
+          {tab === 'attendance' && <Attendance child={child} />}
         </>
       )}
     </>
@@ -168,8 +169,39 @@ function Results({ child }) {
           { key: 'pos', label: 'Position', align: 'right', render: (r) => `${r.position} of ${r.outOf}` },
           { key: 'conduct', label: 'Conduct' },
           { key: 'remark', label: 'Remark', className: 'text-slate-600' },
+          { key: 'card', label: '', align: 'right', render: (r) => <Button size="sm" variant="secondary" icon={Download} onClick={() => downloadReportCards(db, [r], `Report card - ${fullName(child)} - ${allTerms(db).find((t) => t.id === r.termId)?.label}`)}>Report card</Button> },
         ]}
       />
+    </Card>
+  );
+}
+
+/** Days the child was marked absent or late in the class register this term. */
+function Attendance({ child }) {
+  const { db } = useStore();
+  const term = currentTerm(db);
+  const days = (db.attendance || []).filter((a) => a.classId === child.classId && term && a.date >= term.start && (!term.end || a.date <= term.end)).sort((a, b) => b.date.localeCompare(a.date));
+  const absent = days.filter((a) => (a.absent || []).includes(child.id));
+  const late = days.filter((a) => (a.late || []).includes(child.id));
+  return (
+    <Card title={`Attendance · ${term?.label || ''}`}>
+      {!days.length ? <Empty title="No register taken yet this term" message="The class teacher records attendance every school day." /> : (
+        <>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="rounded-lg bg-emerald-50 p-3"><p className="text-2xl font-bold text-emerald-700">{days.length - absent.length}</p><p className="text-xs text-slate-600">days present</p></div>
+            <div className="rounded-lg bg-rose-50 p-3"><p className="text-2xl font-bold text-rose-600">{absent.length}</p><p className="text-xs text-slate-600">days absent</p></div>
+            <div className="rounded-lg bg-amber-50 p-3"><p className="text-2xl font-bold text-amber-700">{late.length}</p><p className="text-xs text-slate-600">days late</p></div>
+          </div>
+          {(absent.length > 0 || late.length > 0) && (
+            <ul className="mt-4 divide-y divide-slate-100 text-sm">
+              {[...absent.map((a) => [a.date, 'Absent']), ...late.map((a) => [a.date, 'Late'])].sort((a, b) => b[0].localeCompare(a[0])).map(([d, k]) => (
+                <li key={d + k} className="flex justify-between py-2"><span>{fmtDate(d)}</span><Badge tone={k === 'Absent' ? 'red' : 'amber'}>{k}</Badge></li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-3 text-xs text-slate-500">Out of {days.length} school days recorded so far this term.</p>
+        </>
+      )}
     </Card>
   );
 }

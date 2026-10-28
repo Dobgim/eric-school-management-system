@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable/es';
 import { fmtDate, fmtDateTime, money } from './utils';
+import { markRemark, ordinal } from './subjects';
 
 const BRAND = [38, 76, 57];
 const ACCENT = [199, 134, 42];
@@ -270,4 +271,100 @@ export function payslipPDF({ school, staff, grade, item, month }) {
   doc.text('Employee', w - 74, y + 5);
   footer(doc);
   doc.save(clean(`Payslip ${staff.lastName} ${staff.firstName} ${month}.pdf`));
+}
+
+/**
+ * Report cards (bulletins), one A4 page per pupil.
+ * cards: [{ student, className, term, record, subjects: [{ name, coef }], teacherName, nextTerm }]
+ */
+export function reportCardsPDF({ school, cards, filename }) {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const w = doc.internal.pageSize.getWidth();
+  cards.forEach((c, i) => {
+    if (i) doc.addPage();
+    const r = c.record;
+    let y = letterhead(doc, school, 'REPORT CARD', clean(`${c.term}  |  ${c.className}`));
+    autoTable(doc, {
+      startY: y,
+      theme: 'plain',
+      styles: { fontSize: 9, cellPadding: 1.1 },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 30 }, 2: { fontStyle: 'bold', cellWidth: 30 } },
+      body: [
+        ['Pupil', clean(`${c.student.firstName} ${c.student.otherNames || ''} ${c.student.lastName}`.replace(/\s+/g, ' ')), 'Reg. No', c.student.regNo],
+        ['Class', clean(c.className), 'Date of birth', c.student.dob ? fmtDate(c.student.dob) : '-'],
+        ['Sex', c.student.gender === 'F' ? 'Female' : 'Male', 'Pupils in class', String(r.outOf || '-')],
+      ],
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 3;
+    const rows = c.subjects.map((s) => {
+      const m = r.marks?.[s.name];
+      const has = m !== undefined && m !== null && m !== '';
+      return [clean(s.name), String(s.coef), has ? Number(m).toFixed(2) : '-', has ? (Number(m) * s.coef).toFixed(2) : '-', has ? markRemark(Number(m)) : ''];
+    });
+    const done = c.subjects.filter((s) => r.marks?.[s.name] !== undefined && r.marks?.[s.name] !== '' && r.marks?.[s.name] !== null);
+    const coefs = done.reduce((t, s) => t + Number(s.coef), 0);
+    const total = done.reduce((t, s) => t + Number(r.marks[s.name]) * Number(s.coef), 0);
+    autoTable(doc, {
+      startY: y,
+      head: [['Subject', 'Coef', 'Mark /20', 'Mark x Coef', 'Remark']],
+      body: rows,
+      foot: [['Total', String(coefs), '', total.toFixed(2), '']],
+      styles: { fontSize: 9, cellPadding: 1.8 },
+      headStyles: { fillColor: BRAND },
+      footStyles: { fillColor: [236, 232, 222], textColor: 20 },
+      columnStyles: { 1: { halign: 'center', cellWidth: 16 }, 2: { halign: 'right', cellWidth: 24 }, 3: { halign: 'right', cellWidth: 28 }, 4: { cellWidth: 34 } },
+      // Keep the totals row aligned with the columns above it.
+      didParseCell: (d) => { if (d.section === 'foot') d.cell.styles.halign = d.column.index === 1 ? 'center' : d.column.index >= 2 && d.column.index <= 3 ? 'right' : 'left'; },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 4;
+
+    // Result box: average and position stand out.
+    doc.setFillColor(237, 243, 238);
+    doc.roundedRect(14, y, w - 28, 18, 2, 2, 'F');
+    doc.setTextColor(...BRAND);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('TERM AVERAGE', 20, y + 6);
+    doc.text('POSITION', w / 2 - 10, y + 6);
+    doc.setFontSize(15);
+    doc.text(r.average != null ? `${Number(r.average).toFixed(2)} / 20` : '-', 20, y + 14);
+    doc.text(r.position ? `${ordinal(r.position)} of ${r.outOf}` : '-', w / 2 - 10, y + 14);
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60);
+    const stats = [`Class average: ${r.classAverage != null ? Number(r.classAverage).toFixed(2) : '-'}`, `Highest: ${r.highest != null ? Number(r.highest).toFixed(2) : '-'}`, `Lowest: ${r.lowest != null ? Number(r.lowest).toFixed(2) : '-'}`];
+    stats.forEach((t, k) => doc.text(t, w - 20, y + 5 + k * 4.5, { align: 'right' }));
+    y += 24;
+
+    autoTable(doc, {
+      startY: y,
+      theme: 'grid',
+      styles: { fontSize: 9, cellPadding: 1.8, lineColor: [220, 214, 200] },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 40 } },
+      body: [
+        ['Attendance', r.attendance != null ? `${r.attendance} of ${r.daysOpen || '-'} days present` : '-'],
+        ['Conduct', clean(r.conduct || '-')],
+        ["Class teacher's remark", clean(r.remark || '')],
+        ...(c.nextTerm ? [['Next term begins', fmtDate(c.nextTerm)]] : []),
+      ],
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 22;
+    doc.setDrawColor(150);
+    doc.setLineWidth(0.2);
+    const sig = [['Class teacher', c.teacherName || ''], ['Head teacher', ''], ['Parent / Guardian', '']];
+    const colW = (w - 28) / 3;
+    sig.forEach(([label, name], k) => {
+      const x = 14 + k * colW;
+      doc.line(x + 2, y, x + colW - 6, y);
+      doc.setFontSize(8);
+      doc.setTextColor(80);
+      doc.text(clean(label), x + 2, y + 4);
+      if (name) doc.text(clean(name), x + 2, y + 8);
+    });
+  });
+  footer(doc);
+  doc.save(`${clean(filename || 'Report cards')}.pdf`.replace(/[\/:*?"<>|]/g, '-'));
 }

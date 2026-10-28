@@ -1,5 +1,6 @@
-import { allocate, billLines, feeStatus, termById } from './finance';
-import { payslipPDF, receiptPDF } from './exporters';
+import { allTerms, allocate, billLines, feeStatus, termById } from './finance';
+import { payslipPDF, receiptPDF, reportCardsPDF } from './exporters';
+import { classSubjects } from './subjects';
 import { feeTypeLabel, methodLabel, monthLabel } from './utils';
 
 /** Build and download the official receipt for one payment. */
@@ -38,4 +39,20 @@ export function downloadPayslip(db, run, item) {
     item: { ...item, methodLabel: methodLabel(item.method) },
     month: monthLabel(run.month),
   });
+}
+
+/** Report cards for one or more term records (one page each), in the order given. */
+export function downloadReportCards(db, records, filename) {
+  const terms = allTerms(db);
+  const cards = records.map((r) => {
+    const student = db.students.find((s) => s.id === r.studentId);
+    const cls = db.classes.find((c) => c.id === r.classId);
+    const term = termById(db, r.termId);
+    const teacher = db.staff.find((s) => s.id === cls?.teacherId);
+    const next = terms[terms.findIndex((t) => t.id === r.termId) + 1];
+    // Subjects as they were when the marks were entered, falling back to the class's current list.
+    const subjects = r.subjects?.length ? r.subjects : classSubjects(cls);
+    return { student, className: cls?.name || '', term: term?.label || '', record: r, subjects, teacherName: teacher ? `${teacher.firstName} ${teacher.lastName}` : '', nextTerm: next?.start };
+  }).filter((c) => c.student);
+  if (cards.length) reportCardsPDF({ school: db.school, cards, filename });
 }

@@ -7,7 +7,7 @@ export const COLLECTIONS = [
   'students', 'guardians', 'classes', 'facilities', 'sessions', 'calendarEvents', 'categories', 'feeItems',
   'payments', 'staff', 'salaryScales', 'salaryAdjustments', 'payrollRuns', 'inventory', 'stockMovements', 'sales',
   'academicRecords', 'promotionRecommendations', 'announcements', 'activityLog', 'paymentRequests', 'notifications',
-  'admissionApplications', 'invites',
+  'admissionApplications', 'invites', 'attendance', 'expenses',
 ];
 
 export const newId = (p = '') => p + Date.now().toString(36) + randomBytes(3).toString('hex');
@@ -65,6 +65,10 @@ export function viewFor(user, all) {
       sales: all.sales.filter((s) => kids.has(s.studentId)),
       academicRecords: all.academicRecords.filter((r) => kids.has(r.studentId)),
       paymentRequests: all.paymentRequests.filter((r) => r.guardianId === user.guardianId),
+      // Daily registers of the children's classes, reduced to their own children.
+      attendance: all.attendance.filter((a) => kidClassIds.has(a.classId)).map((a) => ({
+        id: a.id, classId: a.classId, date: a.date, absent: (a.absent || []).filter((id) => kids.has(id)), late: (a.late || []).filter((id) => kids.has(id)),
+      })),
       admissionApplications: all.admissionApplications.filter((a) => a.guardianId && a.guardianId === user.guardianId),
       announcements: all.announcements.filter((a) => a.audience === 'all' || a.audience === 'parents' || (a.audience === 'personal' && (a.guardianIds || []).includes(user.guardianId))),
       staff: teacherDirectory(all, (s) => teacherIds.has(s.id)),
@@ -101,6 +105,7 @@ export function viewFor(user, all) {
       students: pupils,
       guardians: all.guardians.filter((g) => guardianIds.has(g.id)),
       academicRecords: all.academicRecords.filter((r) => ids.has(r.studentId) || r.classId === classId),
+      attendance: all.attendance.filter((a) => a.classId === classId),
       promotionRecommendations: all.promotionRecommendations.filter((r) => ids.has(r.studentId)),
       announcements: all.announcements.filter((a) => a.audience === 'all' || a.audience === 'staff'),
       staff: ownStaff(all.staff.map(staffCard)),
@@ -112,7 +117,7 @@ export function viewFor(user, all) {
 
   // Office staff. The secretary does not see payroll; only the super admin sees account details.
   const view = { ...all, ...base, notifications: base.notifications };
-  if (user.role === 'admin') { view.payrollRuns = ownPay(); view.salaryAdjustments = []; }
+  if (user.role === 'admin') { view.payrollRuns = ownPay(); view.salaryAdjustments = []; view.expenses = []; }
   if (user.role === 'bursar') view.admissionApplications = [];
   // Invitation codes are secrets: only the super admin sees them.
   if (user.role !== 'superadmin') view.invites = [];
@@ -122,8 +127,8 @@ export function viewFor(user, all) {
 
 // Collections each office role may change. Teachers and parents are handled row by row below.
 const WRITE = {
-  admin: ['students', 'guardians', 'classes', 'facilities', 'sessions', 'calendarEvents', 'academicRecords', 'promotionRecommendations', 'announcements', 'staff', 'notifications', 'activityLog'],
-  bursar: ['payments', 'feeItems', 'categories', 'payrollRuns', 'salaryAdjustments', 'salaryScales', 'staff', 'inventory', 'stockMovements', 'sales', 'paymentRequests', 'notifications', 'activityLog'],
+  admin: ['students', 'guardians', 'classes', 'facilities', 'sessions', 'calendarEvents', 'academicRecords', 'promotionRecommendations', 'announcements', 'staff', 'notifications', 'activityLog', 'attendance'],
+  bursar: ['payments', 'feeItems', 'categories', 'payrollRuns', 'salaryAdjustments', 'salaryScales', 'staff', 'inventory', 'stockMovements', 'sales', 'paymentRequests', 'notifications', 'activityLog', 'expenses'],
 };
 const KV_WRITE = { superadmin: ['school', 'settings'], admin: ['school', 'settings'] };
 export const COUNTER_ACCESS = {
@@ -202,7 +207,8 @@ export async function applyOps(q, user, ops) {
       const rec = after || before;
       if (c === 'academicRecords' && tClass && rec.classId === tClass && inClass(rec.studentId)) { /* ok */ }
       else if (c === 'promotionRecommendations' && tClass && inClass(rec.studentId)) { /* ok */ }
-      else throw new Forbidden('Teachers can only record results and recommendations for their own class.');
+      else if (c === 'attendance' && t === 'put' && tClass && rec.classId === tClass) { /* ok: own class register */ }
+      else throw new Forbidden('Teachers can only record results, attendance and recommendations for their own class.');
     } else if (user.role === 'parent') {
       if (c === 'paymentRequests' && t === 'put' && !before) {
         const items = after.items || [];
@@ -234,6 +240,7 @@ export async function applyOps(q, user, ops) {
     }
 
     if (c === 'announcements' && t === 'put') { await writeAnnouncement(all, user, before, after, putRecord, now); continue; }
+    if (c === 'attendance' && t === 'put') { await writeAttendance(all, user, before, after, putRecord, now); continue; }
     if (t === 'put') await putRecord(c, after);
     else if (t === 'del') { await q('delete from records where collection = $1 and id = $2', [c, id]); changed.add(c); }
     else throw new Invalid(`Unknown operation ${t}`);
@@ -274,6 +281,35 @@ async function addApplication(q, user, all, v, putRecord, now) {
 }
 
 const STAFF_ROLES = ['superadmin', 'admin', 'bursar', 'teacher', 'staff'];
+
+/**
+ * Save a class's register for one day and tell the parents of every pupil newly marked absent
+ * (in the app and on their phone), so they know the same morning.
+ */
+async function writeAttendance(all, user, before, after, putRecord, now) {
+  const cls = all.classes.find((c) => c.id === after.classId);
+  if (!cls || !/^\d{4}-\d{2}-\d{2}$/.test(after.date || '')) throw new Invalid('Choose the class and the date.');
+  // Dates are the school's local date (Cameroon is UTC+1); allow for time zones ahead of UTC.
+  if (after.date > new Date(Date.now() + 14 * 3600e3).toISOString().slice(0, 10)) throw new Invalid('You can’t take the register for a future date.');
+  const inClass = new Set(all.students.filter((s) => s.classId === cls.id && s.status === 'active').map((s) => s.id));
+  const absent = [...new Set(after.absent || [])].filter((id) => inClass.has(id));
+  const late = [...new Set(after.late || [])].filter((id) => inClass.has(id) && !absent.includes(id));
+  await putRecord('attendance', { id: `att-${cls.id}-${after.date}`, classId: cls.id, date: after.date, absent, late, present: inClass.size - absent.length, takenBy: user.id, takenAt: now });
+  // Compare with the register already saved for this class and day, whatever id the browser sent.
+  const saved = all.attendance.find((a) => a.classId === cls.id && a.date === after.date) || before;
+  const was = new Set(saved?.absent || []);
+  const when = after.date >= now.slice(0, 10) ? 'today' : `on ${after.date}`;
+  for (const id of absent.filter((x) => !was.has(x))) {
+    const s = all.students.find((x) => x.id === id);
+    const userIds = all.users.filter((u) => u.role === 'parent' && u.status === 'active' && (s.guardianIds || []).includes(u.guardianId)).map((u) => u.id);
+    if (!userIds.length) continue;
+    await putRecord('notifications', {
+      id: newId('nt'), userIds, roles: [], kind: 'info', link: `/portal/children?child=${s.id}&tab=attendance`, readBy: [], createdAt: now, by: user.id,
+      title: `${s.firstName} was marked absent ${when}`,
+      body: `${s.firstName} ${s.lastName} (${cls.name}) was not in class ${when}. If this is a mistake or your child is sick, please contact the school.`,
+    });
+  }
+}
 
 /**
  * Save an announcement and, when it is new, notify the people it is for (in the app and on their phones).

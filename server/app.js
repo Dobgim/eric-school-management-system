@@ -160,6 +160,18 @@ app.post('/api/ops', requireUser, wrap(async (req, res) => {
   res.json({ ok: true, changed: [...changed] });
 }));
 
+// Full copy of the school's data for safekeeping (super admin). Passwords and payment keys are never included.
+app.get('/api/backup', requireUser, wrap(async (req, res) => {
+  if (req.user.role !== 'superadmin') throw new Forbidden('Only the super admin can download a backup.');
+  const conn = await db();
+  const data = await loadAll(conn.query);
+  const stamp = new Date().toISOString().slice(0, 10);
+  const name = String(data.school?.shortName || data.school?.name || 'school').replace(/[^\w-]+/g, '-').slice(0, 40);
+  res.set({ 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename="${name}-backup-${stamp}.json"`, 'Cache-Control': 'no-store' });
+  res.send(JSON.stringify({ app: 'School Information System', exportedAt: new Date().toISOString(), exportedBy: req.user.name, data }, null, 1));
+  await logEntry(conn.query, req.user.id, 'Downloaded full backup');
+}));
+
 app.post('/api/counters/:name', requireUser, wrap(async (req, res) => {
   if (!(COUNTER_ACCESS[req.user.role] || []).includes(req.params.name)) throw new Forbidden('Not allowed.');
   const conn = await db();
