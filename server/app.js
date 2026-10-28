@@ -79,7 +79,7 @@ app.get('/api/public/school', wrap(async (req, res) => {
 
 // ---- Auth
 app.post('/api/auth/login', wrap(async (req, res) => {
-  const { username = '', password = '', portal } = req.body || {};
+  const { username = '', password = '', portal, remember = true } = req.body || {};
   const key = `${req.ip}|${String(username).toLowerCase()}`;
   if (loginBlocked(key)) return res.status(429).json({ error: 'Too many attempts. Wait 15 minutes and try again.' });
   const conn = await db();
@@ -115,7 +115,7 @@ app.post('/api/auth/login', wrap(async (req, res) => {
   clearFailures(key);
   await conn.query('update users set last_login = now() where id = $1', [row.id]);
   await logEntry(conn.query, row.id, 'Signed in');
-  setSessionCookie(req, res, row);
+  setSessionCookie(req, res, row, { remember: remember !== false });
   res.json({ user: toClientUser({ ...row, last_login: new Date() }) });
 }));
 

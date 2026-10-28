@@ -73,6 +73,14 @@ const readCache = () => { try { return JSON.parse(localStorage.getItem(CACHE_KEY
 const writeCache = (user, db) => { try { localStorage.setItem(CACHE_KEY, JSON.stringify({ user, db, at: new Date().toISOString() })); } catch { /* storage full or blocked */ } };
 const clearCache = () => { try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ } };
 
+// Without "Remember me", the offline copy of the data must not outlive the browser session (shared computers):
+// a new browser session finds no session marker and drops it. The server cookie ends with the session too.
+const REMEMBER_KEY = 'sis:remember';
+try {
+  if (localStorage.getItem(REMEMBER_KEY) === '0' && !sessionStorage.getItem('sis:open')) clearCache();
+  sessionStorage.setItem('sis:open', '1');
+} catch { /* storage blocked */ }
+
 // Outbox: things a parent submits while offline (payments to verify, admission applications) are kept on the
 // phone and sent automatically when the connection returns. Items are tagged with the user who made them.
 const OUTBOX_KEY = 'sis:outbox:v1';
@@ -345,9 +353,10 @@ export function StoreProvider({ children }) {
     setStatus('ready');
   }, [apply]);
 
-  const login = useCallback(async (username, password, portal) => {
+  const login = useCallback(async (username, password, portal, remember = true) => {
     try {
-      const { user: u } = await request('/api/auth/login', { method: 'POST', body: { username, password, portal } });
+      const { user: u } = await request('/api/auth/login', { method: 'POST', body: { username, password, portal, remember } });
+      try { localStorage.setItem(REMEMBER_KEY, remember ? '1' : '0'); } catch { /* storage blocked */ }
       await enter(u);
       return { user: u };
     } catch (e) {

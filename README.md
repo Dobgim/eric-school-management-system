@@ -126,6 +126,7 @@ Codes that are used, expired, cancelled or made up are refused, by the page and 
 
 ### Signing in and forgotten passwords
 
+- **Remember me** (ticked by default) keeps you signed in on that device for 30 days and fills in your sign-in name next time. Untick it on a shared computer: you are signed out when the browser closes (after 12 hours at most), and the app's offline copy of the data is removed.
 - **Signing in.** Everyone can use their username or their email address. Parents can also use their phone number, written any way: `677 12 34 56` and `+237677123456` both work. An email is added under *My Account* (or by the super admin under *Users*), and no two accounts can share one.
 - **Parents who forgot their password.** On the sign-in page, *Forgot password?* lets a parent enter their phone number plus one child's registration number (or the `APP-…` reference of a pending application) and date of birth, then choose a new password. They are signed in straight away. This also works for parent accounts the office created, using the phone number on the guardian record. Attempts are rate-limited.
 - **Staff who forgot their password.** The super admin sets a temporary one under *Users & Activity → Reset*.

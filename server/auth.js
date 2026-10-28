@@ -45,9 +45,11 @@ export const toClientUser = (row) => row && ({
   createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
 });
 
-export function setSessionCookie(req, res, user) {
-  const token = jwt.sign({ sub: user.id }, secret(), { expiresIn: '30d' });
-  res.cookie(COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: req.secure, maxAge: 30 * 24 * 3600 * 1000, path: '/' });
+// "Remember me": stay signed in for 30 days. Otherwise the cookie ends when the browser closes,
+// and the session expires after 12 hours at most (for shared computers).
+export function setSessionCookie(req, res, user, { remember = true } = {}) {
+  const token = jwt.sign({ sub: user.id }, secret(), { expiresIn: remember ? '30d' : '12h' });
+  res.cookie(COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: req.secure, path: '/', ...(remember ? { maxAge: 30 * 24 * 3600 * 1000 } : {}) });
 }
 
 export const clearSessionCookie = (res) => res.clearCookie(COOKIE, { path: '/' });

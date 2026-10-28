@@ -7,11 +7,16 @@ import { Logo } from '../components/Layout';
 import { Button, Field, Input } from '../components/ui';
 import { InstallButton } from '../components/InstallApp';
 
+const LAST_LOGIN = 'sis:last-login';
+
 export default function Login() {
   const { school, login, serverProblem } = useStore();
   const nav = useNavigate();
-  const [portal, setPortal] = useState('staff');
-  const [form, setForm] = useState({ username: '', password: '' });
+  // "Remember me" also fills in the last sign-in name on this device.
+  const saved = (() => { try { return JSON.parse(localStorage.getItem(LAST_LOGIN)) || null; } catch { return null; } })();
+  const [portal, setPortal] = useState(saved?.portal || 'staff');
+  const [form, setForm] = useState({ username: saved?.username || '', password: '' });
+  const [remember, setRemember] = useState(true);
   const [show, setShow] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -20,9 +25,13 @@ export default function Login() {
     e.preventDefault();
     setBusy(true);
     setError('');
-    const res = await login(form.username, form.password, portal);
+    const res = await login(form.username, form.password, portal, remember);
     setBusy(false);
     if (res.error) return setError(res.error);
+    try {
+      if (remember) localStorage.setItem(LAST_LOGIN, JSON.stringify({ portal, username: form.username.trim() }));
+      else localStorage.removeItem(LAST_LOGIN);
+    } catch { /* storage blocked */ }
     nav(homePath(res.user), { replace: true });
   };
 
@@ -62,16 +71,21 @@ export default function Login() {
 
           <form onSubmit={submit} className="mt-6 space-y-4">
             <Field label={portal === 'parent' ? 'Phone number or email' : 'Username or email'}>
-              <Input autoComplete="username" inputMode={portal === 'parent' ? 'email' : undefined} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required autoFocus />
+              <Input autoComplete="username" inputMode={portal === 'parent' ? 'email' : undefined} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required autoFocus={!saved?.username} />
             </Field>
             <Field label={<span className="flex items-center justify-between">Password<Link to="/forgot" className="font-semibold text-brand-700 hover:underline">Forgot password?</Link></span>}>
               <div className="relative">
-                <Input type={show ? 'text' : 'password'} autoComplete="current-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required className="pr-10" />
+                <Input type={show ? 'text' : 'password'} autoComplete="current-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required autoFocus={!!saved?.username} className="pr-10" />
                 <button type="button" onClick={() => setShow(!show)} className="absolute top-1/2 right-2.5 -translate-y-1/2 text-slate-400 hover:text-slate-600" aria-label={show ? 'Hide password' : 'Show password'}>
                   {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
             </Field>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" className="size-4 accent-brand-700" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+              Remember me
+              <span className="text-xs text-slate-500">{remember ? '(stay signed in for 30 days)' : '(sign out when the browser closes)'}</span>
+            </label>
             {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
             <Button type="submit" icon={LogIn} className="w-full" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</Button>
           </form>
