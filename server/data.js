@@ -37,7 +37,11 @@ const teacherClassId = (all, user) => all.classes.find((c) => c.teacherId && c.t
 const parentChildIds = (all, user) => all.students.filter((s) => (s.guardianIds || []).includes(user.guardianId)).map((s) => s.id);
 const forUser = (n, user) => (n.userIds || []).includes(user.id) || (n.roles || []).includes(user.role);
 const minimalUsers = (all) => all.users.filter((u) => u.status === 'active').map((u) => ({ id: u.id, name: u.name, role: u.role }));
-const staffCard = (s) => ({ id: s.id, firstName: s.firstName, lastName: s.lastName, gender: s.gender, phone: s.phone, position: s.position, classId: s.classId, category: s.category, status: s.status, staffNo: s.staffNo });
+const staffCard = (s) => ({ id: s.id, firstName: s.firstName, lastName: s.lastName, gender: s.gender, phone: s.phone, position: s.position, classId: s.classId, category: s.category, status: s.status, staffNo: s.staffNo, teaching: s.teaching || [] });
+// Who teaches what, for every signed-in user: names, classes and subjects only, no contact details.
+const isTeacher = (all, s) => s.status === 'active' && (s.category === 'teaching' || (s.teaching || []).length || all.classes.some((c) => c.teacherId === s.id));
+const directoryCard = (s) => ({ ...staffCard(s), phone: undefined });
+const teacherDirectory = (all, keep = () => false) => all.staff.filter((s) => isTeacher(all, s)).map((s) => (keep(s) ? staffCard(s) : directoryCard(s)));
 
 /** The slice of the database a user is allowed to read. */
 export function viewFor(user, all) {
@@ -63,7 +67,7 @@ export function viewFor(user, all) {
       paymentRequests: all.paymentRequests.filter((r) => r.guardianId === user.guardianId),
       admissionApplications: all.admissionApplications.filter((a) => a.guardianId && a.guardianId === user.guardianId),
       announcements: all.announcements.filter((a) => a.audience === 'all' || a.audience === 'parents'),
-      staff: all.staff.filter((s) => teacherIds.has(s.id)).map(staffCard),
+      staff: teacherDirectory(all, (s) => teacherIds.has(s.id)),
       users: minimalUsers(all),
     };
   }
@@ -77,7 +81,7 @@ export function viewFor(user, all) {
     return {
       ...empty, ...base,
       settings: { currentSessionId: all.settings.currentSessionId, currentTermId: all.settings.currentTermId, counters: {} },
-      staff: all.staff.filter((s) => s.id === user.staffId),
+      staff: [...all.staff.filter((s) => s.id === user.staffId), ...teacherDirectory(all).filter((s) => s.id !== user.staffId)],
       salaryScales: ownScale(),
       payrollRuns: ownPay(),
       announcements: all.announcements.filter((a) => a.audience === 'all' || a.audience === 'staff'),
@@ -280,14 +284,19 @@ async function writeUser(q, user, all, op) {
   if (all.users.some((u) => u.id !== v.id && u.username.toLowerCase() === username.toLowerCase())) throw new Invalid('That username is taken.');
   if (existing && existing.id === user.id && (v.role !== 'superadmin' || v.active === false)) throw new Invalid("You can't demote or deactivate your own account.");
   if (v.password !== undefined && v.password !== '' && String(v.password).length < 6) throw new Invalid('Password must be at least 6 characters.');
+  // Email doubles as a sign-in name, so it must be unique. Undefined = leave unchanged.
+  const email = v.email === undefined ? undefined : String(v.email || '').trim().toLowerCase() || null;
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Invalid('Enter a valid email address.');
+  if (email && all.users.some((u) => u.id !== v.id && (u.email || '').toLowerCase() === email)) throw new Invalid('That email is already used by another account.');
   if (existing) {
     await q('update users set username = $2, role = $3, name = $4, staff_id = $5, guardian_id = $6, active = $7 where id = $1',
       [existing.id, username, v.role, v.name.trim(), v.staffId || null, v.guardianId || null, v.active !== false]);
+    if (email !== undefined) await q('update users set email = $2 where id = $1', [existing.id, email]);
     if (v.password) await q('update users set password_hash = $2 where id = $1', [existing.id, await hashPassword(v.password)]);
   } else {
     if (!v.password) throw new Invalid('A password is required for new accounts.');
-    await q('insert into users (id, username, password_hash, role, name, staff_id, guardian_id, active) values ($1, $2, $3, $4, $5, $6, $7, $8)',
-      [v.id || newId('u'), username, await hashPassword(v.password), v.role, v.name.trim(), v.staffId || null, v.guardianId || null, v.active !== false]);
+    await q('insert into users (id, username, password_hash, role, name, staff_id, guardian_id, active, email) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+      [v.id || newId('u'), username, await hashPassword(v.password), v.role, v.name.trim(), v.staffId || null, v.guardianId || null, v.active !== false, email || null]);
   }
 }
 

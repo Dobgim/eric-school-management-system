@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
-  AlertTriangle, BarChart3, BookOpenCheck, Building2, ClipboardList, GraduationCap, LayoutDashboard, LogOut,
+  AlertTriangle, Banknote, BarChart3, BookOpen, BookOpenCheck, Building2, ClipboardList, GraduationCap, LayoutDashboard, LogOut,
   CloudOff, Megaphone, Menu, Smartphone, UserPlus, Package, Receipt, Settings2, ShieldCheck, Users, UserRound, Wallet, X, ArrowUpCircle, Home, Contact,
 } from 'lucide-react';
 import { useStore } from '../lib/store';
@@ -37,6 +37,10 @@ const NAV = [
     { to: '/portal/pay', label: 'Pay Fees', icon: Smartphone, perm: 'portal' },
     { to: '/portal/payments', label: 'Payments & Receipts', icon: Receipt, perm: 'portal' },
     { to: '/portal/news', label: 'News & Calendar', icon: Megaphone, perm: 'portal' },
+  ] },
+  { group: 'School', items: [
+    { to: '/school-fees', label: 'School fees', icon: Banknote, perm: 'everyone' },
+    { to: '/teachers', label: 'Teachers & subjects', icon: BookOpen, perm: 'everyone' },
   ] },
   { group: 'Academics', items: [
     { to: '/students', label: 'Students', icon: Users, perm: 'students.view' },
@@ -97,6 +101,7 @@ function ParentTabBar() {
 }
 
 export const allowed = (user, perm) => {
+  if (perm === 'everyone') return true;
   if (perm === 'users') return user.role === 'superadmin';
   if (perm === 'signups') return user.role === 'superadmin' || user.role === 'admin';
   // Own payslips: anyone linked to a staff record (the bursar and proprietor already see all of payroll).

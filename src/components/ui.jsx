@@ -265,7 +265,7 @@ export function ExportButtons({ onPdf, onExcel }) {
   return (
     <>
       <Button variant="secondary" size="sm" icon={FileText} onClick={onPdf}>PDF</Button>
-      <Button variant="secondary" size="sm" icon={FileSpreadsheet} onClick={onExcel}>Excel</Button>
+      {onExcel && <Button variant="secondary" size="sm" icon={FileSpreadsheet} onClick={onExcel}>Excel</Button>}
     </>
   );
 }

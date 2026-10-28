@@ -7,7 +7,7 @@ import { fmtDate } from '../lib/utils';
 import { Logo } from '../components/Layout';
 import { Button, Field, Input, Select } from '../components/ui';
 
-function PasswordInput({ value, onChange }) {
+export function PasswordInput({ value, onChange }) {
   const [show, setShow] = useState(false);
   return (
     <div className="relative">

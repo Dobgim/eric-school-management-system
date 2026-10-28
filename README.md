@@ -124,6 +124,12 @@ Nobody can sign up as staff on their own.
 
 Codes that are used, expired, cancelled or made up are refused, by the page and by the server.
 
+### Signing in and forgotten passwords
+
+- **Signing in.** Everyone can use their username or their email address. Parents can also use their phone number, written any way: `677 12 34 56` and `+237677123456` both work. An email is added under *My Account* (or by the super admin under *Users*), and no two accounts can share one.
+- **Parents who forgot their password.** On the sign-in page, *Forgot password?* lets a parent enter their phone number plus one child's registration number (or the `APP-…` reference of a pending application) and date of birth, then choose a new password. They are signed in straight away. This also works for parent accounts the office created, using the phone number on the guardian record. Attempts are rate-limited.
+- **Staff who forgot their password.** The super admin sets a temporary one under *Users & Activity → Reset*.
+
 ### Rules that apply to everyone
 
 - Pending and rejected accounts can't sign in. A rejected person sees the reason that was given.
@@ -150,6 +156,8 @@ Codes that are used, expired, cancelled or made up are refused, by the page and 
 | Parent sign-up; parents registering several children at once; office admits or declines | Register children, Admission applications |
 | Staff accounts by one-time invitation only; staff payslips | Users & Activity → Staff invitations, My Payslips |
 | Live notifications on every signed-in device | Bell in the header |
+| Fee schedule: what every class pays per term, for new and returning pupils (PDF/Excel), visible to everyone | School fees |
+| Who teaches what, by teacher and by class, for parents and staff; subjects are set on each staff record | Teachers & subjects |
 
 ## Parent payments
 

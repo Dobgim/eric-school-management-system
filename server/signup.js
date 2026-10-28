@@ -89,6 +89,9 @@ export function signupRoutes(app, wrap, requireUser, broadcast) {
           ? (taken.rows[0].status === 'pending' ? 'A sign-up with this phone number is already waiting for approval.' : 'An account with this phone number already exists. Sign in, or ask the school to reset your password.')
           : 'That username is taken. Choose another one.');
       }
+      if (email && (await q('select 1 from users where lower(email) = $1', [email])).rows.length) {
+        throw new Invalid('That email is already used by another account. Sign in with it, or leave the email empty.');
+      }
       const id = newId('u');
       const hash = await hashPassword(password);
       const all = await loadAll(q);
@@ -266,6 +269,37 @@ export function signupRoutes(app, wrap, requireUser, broadcast) {
     });
     broadcast({ type: 'change', by: null, collections: ['admissionApplications', 'notifications'] });
     res.json({ ok: true });
+  }));
+
+  // ---------- Parents reset a forgotten password themselves ----------
+  // Proof of identity: the parent's phone number + one of their children's registration number (or, before
+  // admission, the application reference) + that child's date of birth. Then they are signed straight in.
+  app.post('/api/auth/reset-parent', wrap(async (req, res) => {
+    const b = req.body || {};
+    const phone = digits(b.phone);
+    if (throttled('reset', `${req.ip}|${phone}`, 5)) return res.status(429).json({ error: 'Too many attempts. Wait an hour, or ask the school office to reset your password.' });
+    const password = String(b.password || '');
+    if (!/^\d{9}$/.test(phone)) throw new Invalid('Enter the phone number you signed up with.');
+    if (password.length < 8) throw new Invalid('Choose a new password of at least 8 characters.');
+    const childRef = clean(b.childRef, 40).toLowerCase();
+    const childDob = clean(b.childDob, 10);
+    const conn = await db();
+    const user = await conn.tx(async (q) => {
+      // Accounts the office created may use any username, so also match the phone on the guardian record.
+      const all = await loadAll(q);
+      const guardianIds = all.guardians.filter((g) => digits(g.phone) === phone || digits(g.altPhone) === phone).map((g) => g.id);
+      const { rows } = await q(`select * from users where role = 'parent' and status = 'active' and (username = $1 or phone = $1 or guardian_id = any($2))`, [phone, guardianIds]);
+      const matches = (gid) => gid && (
+        all.students.some((s) => (s.guardianIds || []).includes(gid) && s.regNo?.toLowerCase() === childRef && s.dob === childDob)
+        || all.admissionApplications.some((a) => a.guardianId === gid && a.ref?.toLowerCase() === childRef && a.dob === childDob));
+      const row = rows.find((r) => matches(r.guardian_id));
+      if (!row) throw new Invalid('Those details don’t match our records. Check the phone number, the registration number and the date of birth — or ask the school office to reset your password.');
+      await q('update users set password_hash = $2 where id = $1', [row.id, await hashPassword(password)]);
+      await log(q, row.id, 'Reset own password', 'Verified with child details');
+      return row;
+    });
+    setSessionCookie(req, res, user);
+    res.json({ ok: true, user: toClientUser(user) });
   }));
 
   // ---------- Office decisions on parent sign-ups that couldn't be matched ----------

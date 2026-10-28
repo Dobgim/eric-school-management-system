@@ -1,6 +1,6 @@
 // Service worker: makes the app installable and lets it open without internet.
 // Bump VERSION when this file's caching rules change; new builds are picked up automatically.
-const VERSION = 'v4';
+const VERSION = 'v5';
 const SHELL = `sis-shell-${VERSION}`;
 const ASSETS = `sis-assets-${VERSION}`;
 const FONTS = `sis-fonts-${VERSION}`;

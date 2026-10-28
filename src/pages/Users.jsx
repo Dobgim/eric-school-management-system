@@ -47,7 +47,7 @@ function UserList() {
     if (db.users.some((u) => u.id !== f.id && u.username.toLowerCase() === f.username.trim().toLowerCase())) return notify('That username is taken.');
     if (!f.id && (f.password || '').length < 6) return notify('Password must be at least 6 characters.');
     if (f.id === me.id && (f.role !== 'superadmin' || !f.active)) return notify('You cannot demote or deactivate your own account.');
-    const patch = { name: f.name.trim(), username: f.username.trim(), role: f.role, active: f.active, staffId: f.staffId || null, guardianId: f.guardianId || null };
+    const patch = { name: f.name.trim(), username: f.username.trim(), role: f.role, active: f.active, staffId: f.staffId || null, guardianId: f.guardianId || null, email: (f.email || '').trim() };
     // Sent straight to the server, which hashes the password; it is never kept in the browser.
     try {
       await api.request('/api/ops', { method: 'POST', body: { ops: [{ t: 'put', c: 'users', v: { ...patch, id: f.id || uid('u'), ...(f.password ? { password: f.password } : {}) } }] } });
@@ -63,7 +63,7 @@ function UserList() {
       {toast}
       <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 p-4">
         <Select value={role} onChange={(e) => setRole(e.target.value)} placeholder="All roles" options={Object.entries(ROLES).map(([value, label]) => ({ value, label }))} className="sm:w-60" />
-        <Button className="ml-auto" size="sm" icon={UserPlus} onClick={() => setForm({ name: '', username: '', role: 'teacher', active: true, password: '', staffId: '', guardianId: '' })}>New user</Button>
+        <Button className="ml-auto" size="sm" icon={UserPlus} onClick={() => setForm({ name: '', username: '', email: '', role: 'teacher', active: true, password: '', staffId: '', guardianId: '' })}>New user</Button>
       </div>
       <DataTable
         rows={rows}
@@ -92,6 +92,7 @@ function UserList() {
             )}
             <Field label="Display name"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
             <Field label="Username"><Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></Field>
+            <Field label="Email (optional)" className="sm:col-span-2" hint="Can be used to sign in instead of the username."><Input type="email" value={form.email || ''} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
             <Field label={form.id ? 'New password (leave blank to keep)' : 'Password'}><Input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field>
             <label className="flex items-center gap-2 pt-6 text-sm font-medium text-slate-700"><input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} /> Account active</label>
             <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600 sm:col-span-2"><b>Access:</b> {ACCESS[form.role]}</p>

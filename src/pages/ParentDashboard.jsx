@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarDays, Clock, Download, GraduationCap, Megaphone, Smartphone, UserPlus, Users, Wallet } from 'lucide-react';
+import { ArrowRight, Banknote, BookOpen, CalendarDays, Clock, Download, GraduationCap, Megaphone, Smartphone, UserPlus, Users, Wallet } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { currentTerm, feeStatus, pendingFor } from '../lib/finance';
 import { downloadReceipt } from '../lib/documents';
@@ -139,6 +139,19 @@ export default function ParentDashboard() {
           )}
         </div>
         <div className="space-y-6">
+          <Card title="About the school" bodyClass="p-0">
+            <ul className="divide-y divide-slate-100 text-sm">
+              {[['/school-fees', Banknote, 'School fees', 'What every class pays per term'], ['/teachers', BookOpen, 'Teachers & subjects', 'Who teaches each class and subject']].map(([to, Icon, title, text]) => (
+                <li key={to}>
+                  <Link to={to} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
+                    <Icon className="size-5 shrink-0 text-brand-700" />
+                    <span className="flex-1"><span className="block font-semibold text-slate-800">{title}</span><span className="block text-xs text-slate-500">{text}</span></span>
+                    <ArrowRight className="size-4 text-slate-400" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
           <Card title="Announcements" actions={<Link to="/portal/news" className="text-sm font-semibold text-brand-700 hover:underline"><Megaphone className="inline size-4" /></Link>}>
             {news.length ? (
               <ul className="space-y-4">

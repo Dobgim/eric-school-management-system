@@ -32,6 +32,9 @@ import Signups from './pages/Signups';
 import MyWork from './pages/MyWork';
 import ParentAdmissions from './pages/ParentAdmissions';
 import Admissions from './pages/Admissions';
+import ForgotPassword from './pages/ForgotPassword';
+import SchoolFees from './pages/SchoolFees';
+import Teachers from './pages/Teachers';
 
 function Guard({ perm, children }) {
   const { user } = useStore();
@@ -45,6 +48,7 @@ export default function App() {
     return (
       <Routes>
         <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot" element={<ForgotPassword />} />
         <Route path="*" element={<Login />} />
       </Routes>
     );
@@ -82,6 +86,9 @@ export default function App() {
         <Route path="portal/admissions" element={g('portal', <ParentAdmissions />)} />
         <Route path="admissions" element={g('students.edit', <Admissions />)} />
         <Route path="account" element={<Account />} />
+        <Route path="school-fees" element={<SchoolFees />} />
+        <Route path="teachers" element={<Teachers />} />
+        <Route path="forgot" element={<Navigate to={homePath(user)} replace />} />
         <Route path="me" element={g('me', <MyWork />)} />
         <Route path="signups" element={g('signups', <Signups />)} />
         <Route path="signup" element={<Navigate to={homePath(user)} replace />} />

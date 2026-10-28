@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Pencil, Plus, UserPlus } from 'lucide-react';
+import { Pencil, Plus, Trash2, UserPlus } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { can } from '../lib/permissions';
 import { exportExcel, exportTablePDF } from '../lib/exporters';
 import { fmtDate, money, pad, today, uid } from '../lib/utils';
+import { SUBJECTS } from '../lib/subjects';
 import { Avatar, Badge, Button, Card, DataTable, ExportButtons, Field, Input, Modal, PageHeader, SearchInput, Select, StatCard, Tabs, useToast } from '../components/ui';
 
-const blank = { firstName: '', lastName: '', gender: 'F', category: 'teaching', position: '', qualification: '', phone: '', email: '', dateEmployed: '', dob: '', address: '', gradeId: '', bankName: '', accountNo: '', momoNumber: '', classId: null, status: 'active' };
+const blank = { firstName: '', lastName: '', gender: 'F', category: 'teaching', position: '', qualification: '', phone: '', email: '', dateEmployed: '', dob: '', address: '', gradeId: '', bankName: '', accountNo: '', momoNumber: '', classId: null, status: 'active', teaching: [] };
 
 export default function Staff() {
   const { db, user } = useStore();
@@ -43,7 +44,7 @@ function StaffList() {
   const monthly = active.reduce((t, s) => { const g = grade(s.gradeId); return t + (g ? g.basic + g.housing + g.transport : 0); }, 0);
 
   const save = async () => {
-    const s = editing;
+    const s = { ...editing, teaching: (editing.teaching || []).map((t) => ({ subject: t.subject.trim(), classIds: t.classIds || [] })).filter((t) => t.subject) };
     if (!s.firstName.trim() || !s.lastName.trim() || !s.position.trim()) return notify('Name and position are required.');
     if (s.id) {
       api.update('staff', s.id, s);
@@ -117,6 +118,7 @@ function StaffList() {
               <Field label="Date employed"><Input type="date" value={editing.dateEmployed} onChange={(e) => setEditing({ ...editing, dateEmployed: e.target.value })} /></Field>
               <Field label="Address" className="sm:col-span-2"><Input value={editing.address} onChange={(e) => setEditing({ ...editing, address: e.target.value })} /></Field>
             </div>
+            {editing.category === 'teaching' && <Teaching value={editing.teaching || []} onChange={(teaching) => setEditing({ ...editing, teaching })} />}
             <div className="grid gap-4 rounded-xl bg-slate-50 p-4 sm:grid-cols-3">
               <Field label="Salary scale"><Select value={editing.gradeId} onChange={(e) => setEditing({ ...editing, gradeId: e.target.value })} options={db.salaryScales.map((g) => ({ value: g.id, label: `${g.name} (${money(g.basic + g.housing + g.transport, '')})` }))} /></Field>
               <Field label="Paid via"><Select value={editing.bankName} onChange={(e) => setEditing({ ...editing, bankName: e.target.value })} placeholder="Cash" options={['Afriland First Bank', 'CCA Bank', 'UBA Cameroon', 'Ecobank', 'SGC', 'MTN Mobile Money', 'Orange Money']} /></Field>
@@ -131,6 +133,48 @@ function StaffList() {
         )}
       </Modal>
     </>
+  );
+}
+
+/** Subjects this teacher takes and the classes they take each one in. */
+function Teaching({ value, onChange }) {
+  const { db } = useStore();
+  const classes = [...db.classes].sort((a, b) => a.order - b.order);
+  const set = (i, patch) => onChange(value.map((t, j) => (j === i ? { ...t, ...patch } : t)));
+  const toggle = (i, id) => { const ids = value[i].classIds || []; set(i, { classIds: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id] }); };
+  return (
+    <div className="rounded-lg border border-slate-200 p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-800">Subjects taught</h3>
+          <p className="text-xs text-slate-500">Shown to parents and staff under Teachers &amp; subjects.</p>
+        </div>
+        <Button size="sm" variant="secondary" icon={Plus} onClick={() => onChange([...value, { subject: '', classIds: [] }])}>Add subject</Button>
+      </div>
+      {value.length === 0 && <p className="text-sm text-slate-500">No subjects yet.</p>}
+      <datalist id="subject-list">{SUBJECTS.map((s) => <option key={s} value={s} />)}</datalist>
+      <div className="space-y-3">
+        {value.map((t, i) => (
+          <div key={i} className="rounded-md bg-slate-50 p-3">
+            <div className="flex gap-2">
+              <Input list="subject-list" value={t.subject} onChange={(e) => set(i, { subject: e.target.value })} placeholder="Subject, e.g. Mathematics" aria-label="Subject" />
+              <Button size="sm" variant="ghost" icon={Trash2} onClick={() => onChange(value.filter((_, j) => j !== i))} aria-label="Remove subject" />
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {classes.map((c) => {
+                const on = (t.classIds || []).includes(c.id);
+                return (
+                  <button key={c.id} type="button" onClick={() => toggle(i, c.id)} aria-pressed={on}
+                    className={`rounded-sm border px-2 py-1 text-xs font-medium ${on ? 'border-brand-700 bg-brand-700 text-white' : 'border-slate-300 bg-white text-slate-600 hover:border-brand-400'}`}>
+                    {c.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

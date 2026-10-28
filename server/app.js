@@ -66,9 +66,27 @@ app.post('/api/auth/login', wrap(async (req, res) => {
   const key = `${req.ip}|${String(username).toLowerCase()}`;
   if (loginBlocked(key)) return res.status(429).json({ error: 'Too many attempts. Wait 15 minutes and try again.' });
   const conn = await db();
-  const { rows } = await conn.query('select * from users where lower(username) = lower($1)', [String(username).trim()]);
-  const row = rows[0];
-  if (!row || !(await verifyPassword(password, row.password_hash))) {
+  // Sign in with username, email, or (parents) the phone number written any way: "677 12 34 56", "+237677123456".
+  const id = String(username).trim();
+  const phone = normalizePhone(id).replace(/\D/g, '');
+  const byPhone = /^\d{9}$/.test(phone) ? phone : '';
+  // Parent accounts made by the office may have another username; their phone is on the guardian record.
+  const guardianIds = [];
+  if (byPhone) {
+    const { rows: gs } = await conn.query(`select id, data->>'phone' as phone, data->>'altPhone' as alt from records where collection = 'guardians'`);
+    for (const g of gs) if ([g.phone, g.alt].some((p) => p && normalizePhone(p).replace(/\D/g, '') === byPhone)) guardianIds.push(g.id);
+  }
+  const { rows } = await conn.query(
+    `select * from users
+      where lower(username) = lower($1)
+         or (email is not null and lower(email) = lower($1))
+         or ($2 <> '' and (username = $2 or phone = $2))
+         or (role = 'parent' and guardian_id = any($3))`,
+    [id, byPhone, guardianIds],
+  );
+  let row = null;
+  for (const r of rows) if (await verifyPassword(password, r.password_hash)) { row = r; break; }
+  if (!row) {
     recordFailure(key);
     return res.status(401).json({ error: 'Incorrect username or password.' });
   }
@@ -87,6 +105,19 @@ app.post('/api/auth/login', wrap(async (req, res) => {
 app.post('/api/auth/logout', (req, res) => { clearSessionCookie(res); res.json({ ok: true }); });
 
 app.get('/api/auth/me', requireUser, (req, res) => res.json({ user: req.user }));
+
+// Add or change the email you can sign in with.
+app.post('/api/auth/email', requireUser, wrap(async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email address.' });
+  const conn = await db();
+  if (email) {
+    const { rows } = await conn.query('select id from users where lower(email) = $1 and id <> $2', [email, req.user.id]);
+    if (rows.length) return res.status(400).json({ error: 'That email is already used by another account.' });
+  }
+  await conn.query('update users set email = $2 where id = $1', [req.user.id, email || null]);
+  res.json({ ok: true, email });
+}));
 
 app.post('/api/auth/password', requireUser, wrap(async (req, res) => {
   const { current = '', next = '' } = req.body || {};

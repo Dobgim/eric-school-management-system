@@ -61,10 +61,10 @@ export default function Login() {
           </div>
 
           <form onSubmit={submit} className="mt-6 space-y-4">
-            <Field label="Username">
-              <Input autoComplete="username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required autoFocus />
+            <Field label={portal === 'parent' ? 'Phone number or email' : 'Username or email'}>
+              <Input autoComplete="username" inputMode={portal === 'parent' ? 'email' : undefined} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required autoFocus />
             </Field>
-            <Field label="Password">
+            <Field label={<span className="flex items-center justify-between">Password<Link to="/forgot" className="font-semibold text-brand-700 hover:underline">Forgot password?</Link></span>}>
               <div className="relative">
                 <Input type={show ? 'text' : 'password'} autoComplete="current-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required className="pr-10" />
                 <button type="button" onClick={() => setShow(!show)} className="absolute top-1/2 right-2.5 -translate-y-1/2 text-slate-400 hover:text-slate-600" aria-label={show ? 'Hide password' : 'Show password'}>
@@ -87,7 +87,6 @@ export default function Login() {
               <Link to="/signup?as=staff"><Button variant="secondary" size="sm">Staff: I have an invitation</Button></Link>
             </div>
           </div>
-          <p className="mt-6 text-center text-xs text-slate-500">Forgot your password? Ask the school office to reset it.</p>
         </div>
       </div>
     </div>
