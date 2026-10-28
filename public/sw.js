@@ -1,14 +1,39 @@
 // Service worker: makes the app installable and lets it open without internet.
 // Bump VERSION when this file's caching rules change; new builds are picked up automatically.
-const VERSION = 'v2';
+const VERSION = 'v4';
 const SHELL = `sis-shell-${VERSION}`;
 const ASSETS = `sis-assets-${VERSION}`;
 const FONTS = `sis-fonts-${VERSION}`;
 const PRECACHE = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(SHELL).then((c) => c.addAll(PRECACHE)));
+  event.waitUntil(Promise.all([
+    caches.open(SHELL).then((c) => c.addAll(PRECACHE)),
+    precacheBuild().catch(() => {}), // best effort: the app still works online if this fails
+  ]));
 });
+
+// Store every built file the app needs (entry scripts, styles and the chunks they load later, such as the
+// PDF generator) on the first visit, so the app opens and works offline even if the parent visited only once.
+async function precacheBuild() {
+  const cache = await caches.open(ASSETS);
+  const html = await (await fetch('/index.html', { cache: 'no-store' })).text();
+  const queue = [...html.matchAll(/\/assets\/[\w.-]+\.(?:js|css)/g)].map((m) => m[0]);
+  const seen = new Set();
+  while (queue.length) {
+    const url = queue.shift();
+    if (seen.has(url)) continue;
+    seen.add(url);
+    const res = await fetch(url);
+    if (!res.ok) continue;
+    await cache.put(url, res.clone());
+    if (url.endsWith('.js')) {
+      // Vite names chunks "name-<8 char hash>.js" and imports them relative to /assets/.
+      const code = await res.text();
+      for (const m of code.matchAll(/["'`](?:\.\/|\/?assets\/)?([\w.]+-[\w-]{8}\.(?:js|css))["'`]/g)) queue.push(`/assets/${m[1]}`);
+    }
+  }
+}
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {

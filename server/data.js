@@ -208,7 +208,8 @@ export async function applyOps(q, user, ops) {
         if (ref.length < 4) throw new Invalid('Enter the transaction ID.');
         if (all.payments.some((p) => (p.reference || '').toLowerCase() === ref) || all.paymentRequests.some((r) => r.status !== 'rejected' && (r.reference || '').toLowerCase() === ref)) throw new Invalid('This transaction ID has already been used.');
         const amount = items.reduce((s, i) => s + Math.round(Number(i.amount)), 0);
-        const clean = { ...after, guardianId: user.guardianId, userId: user.id, amount, createdAt: now };
+        // The server numbers it: the parent may have saved it offline and sent it later.
+        const clean = { ...after, ref: `PAY-${String(await nextCounter(q, 'request')).padStart(5, '0')}`, guardianId: user.guardianId, userId: user.id, amount, createdAt: now };
         await putRecord(c, clean);
         // Tell the bursar straight away.
         const names = items.map((i) => { const s = all.students.find((x) => x.id === i.studentId); return `${s.firstName} ${s.lastName} (${Math.round(i.amount).toLocaleString('en-US')} XAF)`; }).join(', ');

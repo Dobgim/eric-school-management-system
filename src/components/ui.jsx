@@ -6,7 +6,7 @@ import { initials } from '../lib/utils';
 const cx = (...c) => c.filter(Boolean).join(' ');
 
 const BTN = {
-  primary: 'bg-brand-700 text-white hover:bg-brand-800 shadow-sm',
+  primary: 'bg-brand-700 text-white hover:bg-brand-800',
   secondary: 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50',
   ghost: 'text-slate-600 hover:bg-slate-100',
   danger: 'bg-rose-600 text-white hover:bg-rose-700',
@@ -18,7 +18,7 @@ export function Button({ variant = 'primary', size = 'md', icon: Icon, className
     <button
       type="button"
       className={cx(
-        'inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex items-center justify-center gap-2 rounded-md font-semibold transition disabled:cursor-not-allowed disabled:opacity-50',
         size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-3.5 py-2 text-sm',
         BTN[variant], className,
       )}
@@ -65,7 +65,7 @@ export function Card({ title, actions, children, className, bodyClass = 'p-5' })
     <section className={cx('card', className)}>
       {(title || actions) && (
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-3.5">
-          {title && <h2 className="font-bold text-slate-800">{title}</h2>}
+          {title && <h2 className="text-[1.05rem] font-semibold text-slate-900">{title}</h2>}
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </header>
       )}
@@ -78,7 +78,7 @@ export function PageHeader({ title, subtitle, actions }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">{title}</h1>
+        <h1 className="text-[1.7rem] leading-tight font-semibold text-brand-950">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -95,7 +95,7 @@ const TONES = {
   purple: 'bg-violet-50 text-violet-700',
 };
 export function Badge({ tone = 'slate', children, className }) {
-  return <span className={cx('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap', TONES[tone], className)}>{children}</span>;
+  return <span className={cx('inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap', TONES[tone], className)}>{children}</span>;
 }
 
 export const FEE_STATE = {
@@ -106,16 +106,17 @@ export const FEE_STATE = {
 };
 export const FeeBadge = ({ state }) => <Badge tone={FEE_STATE[state][0]}>{FEE_STATE[state][1]}</Badge>;
 
+/** Summary figure: coloured left edge, small icon beside the label, the number set in the display serif. */
 export function StatCard({ label, value, icon: Icon, tone = 'blue', hint }) {
-  const ring = { blue: 'bg-brand-50 text-brand-700', green: 'bg-emerald-50 text-emerald-700', amber: 'bg-amber-50 text-amber-700', red: 'bg-rose-50 text-rose-700', purple: 'bg-violet-50 text-violet-700' }[tone];
+  const edge = { blue: 'border-l-brand-600', green: 'border-l-emerald-600', amber: 'border-l-accent-500', red: 'border-l-rose-600', purple: 'border-l-violet-600' }[tone];
   return (
-    <div className="card flex min-w-0 items-start gap-4 p-4 sm:p-5">
-      {Icon && <div className={cx('hidden size-11 shrink-0 place-items-center rounded-xl sm:grid', ring)}><Icon className="size-5" /></div>}
-      <div className="min-w-0">
-        <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase sm:text-xs">{label}</p>
-        <p className="mt-1 text-base sm:text-lg leading-tight font-extrabold break-words text-slate-900 tabular-nums 2xl:text-xl">{value}</p>
-        {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
-      </div>
+    <div className={cx('card min-w-0 border-l-[3px] px-4 py-3.5 sm:px-5 sm:py-4', edge)}>
+      <p className="flex items-start gap-1.5 text-[11px] leading-snug font-semibold tracking-wider text-slate-500 uppercase">
+        {Icon && <Icon className="mt-px hidden size-3.5 shrink-0 sm:block" />}
+        <span>{label}</span>
+      </p>
+      <p className="mt-1.5 font-display text-xl leading-tight font-semibold break-words text-slate-900 tabular-nums sm:text-[1.4rem]">{value}</p>
+      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
     </div>
   );
 }

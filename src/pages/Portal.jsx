@@ -63,7 +63,7 @@ function Overview({ child }) {
         <div className="mb-5 flex items-center gap-4">
           <Avatar name={`${child.firstName} ${child.lastName}`} src={child.photo} size="lg" />
           <div>
-            <p className="text-xl font-extrabold text-slate-900">{fullName(child)}</p>
+            <p className="text-xl font-bold text-slate-900">{fullName(child)}</p>
             <p className="font-mono text-sm text-slate-500">{child.regNo}</p>
           </div>
         </div>
@@ -86,7 +86,7 @@ function Overview({ child }) {
           <div className="flex justify-between"><dt className="text-slate-500">Status</dt><dd><FeeBadge state={st.state} /></dd></div>
           <div className="flex justify-between"><dt className="text-slate-500">Term balance</dt><dd className="font-semibold tabular-nums">{money(st.balance, db.school.currency)}</dd></div>
           <div className="flex justify-between"><dt className="text-slate-500">Arrears</dt><dd className="font-semibold text-rose-600 tabular-nums">{money(st.arrears, db.school.currency)}</dd></div>
-          <div className="flex justify-between border-t border-slate-100 pt-2"><dt className="font-semibold">Total owing</dt><dd className="font-extrabold tabular-nums">{money(st.totalDue, db.school.currency)}</dd></div>
+          <div className="flex justify-between border-t border-slate-100 pt-2"><dt className="font-semibold">Total owing</dt><dd className="font-bold tabular-nums">{money(st.totalDue, db.school.currency)}</dd></div>
         </dl>
       </Card>
     </div>

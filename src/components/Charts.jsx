@@ -23,8 +23,8 @@ export function BarChart({ data, height = 220, color = 'var(--color-brand-600)',
           const y = pad.t + ih - t * ih;
           return (
             <g key={t}>
-              <line x1={pad.l} x2={W - pad.r} y1={y} y2={y} stroke="#e2e8f0" />
-              <text x={pad.l - 6} y={y + 4} textAnchor="end" fontSize="11" fill="#64748b">{compact(top * t)}</text>
+              <line x1={pad.l} x2={W - pad.r} y1={y} y2={y} stroke="#e4ddcf" />
+              <text x={pad.l - 6} y={y + 4} textAnchor="end" fontSize="11" fill="#7b7363">{compact(top * t)}</text>
             </g>
           );
         })}
@@ -36,7 +36,7 @@ export function BarChart({ data, height = 220, color = 'var(--color-brand-600)',
             <g key={d.label} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
               <rect x={pad.l + i * bw} y={pad.t} width={bw} height={ih} fill="transparent" />
               <rect x={x} y={pad.t + ih - h} width={w} height={Math.max(h, 0)} rx="4" fill={color} opacity={hover === null || hover === i ? 1 : 0.45} />
-              <text x={x + w / 2} y={H - 9} textAnchor="middle" fontSize="11" fill="#475569">{d.label}</text>
+              <text x={x + w / 2} y={H - 9} textAnchor="middle" fontSize="11" fill="#5f584b">{d.label}</text>
             </g>
           );
         })}
@@ -78,7 +78,7 @@ export function Donut({ data, size = 160, center, format = num }) {
   return (
     <div className="flex flex-wrap items-center gap-6">
       <svg viewBox="0 0 160 160" width={size} height={size} role="img" aria-label="Donut chart" className="shrink-0">
-        <circle cx="80" cy="80" r={r} fill="none" stroke="#f1f5f9" strokeWidth="22" />
+        <circle cx="80" cy="80" r={r} fill="none" stroke="#f2eee5" strokeWidth="22" />
         {data.map((d) => {
           const len = (d.value / total) * c;
           const el = (
@@ -90,8 +90,8 @@ export function Donut({ data, size = 160, center, format = num }) {
         })}
         {center && (
           <>
-            <text x="80" y="78" textAnchor="middle" fontSize="20" fontWeight="800" fill="#0f172a">{center.value}</text>
-            <text x="80" y="96" textAnchor="middle" fontSize="10" fill="#64748b">{center.label}</text>
+            <text x="80" y="78" textAnchor="middle" fontSize="21" fontWeight="600" fill="#201d19" fontFamily="Fraunces, Georgia, serif">{center.value}</text>
+            <text x="80" y="96" textAnchor="middle" fontSize="10" fill="#7b7363">{center.label}</text>
           </>
         )}
       </svg>

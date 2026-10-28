@@ -178,9 +178,14 @@ Any change (a payment, an admission, a confirmation) is pushed to every signed-i
 - **Installable (PWA):**
   - **Android, Chrome or Edge:** tap **Install app**.
   - **iPhone:** in Safari, tap **Share → Add to Home Screen**. The app shows these steps.
-  - Once installed, it opens full-screen, shows the last loaded data when offline (read-only), and offers an **Update now** banner when a new version is deployed.
+  - Once installed, it opens full-screen and offers an **Update now** banner when a new version is deployed.
 
-Phones can only install it when it's served over **HTTPS**, i.e. once deployed.
+### Offline use (parents)
+
+- **The app opens without internet.** On the first visit, the service worker stores everything the app needs, including the PDF generator.
+- **The last loaded information stays on the phone:** children, fees, receipts (downloadable as PDF), payment statement, results, announcements and calendar. A banner says *Offline — showing information saved at …*.
+- **Submitting offline:** *“I've already paid”* submissions and children's admission applications are **kept on the phone** (listed on the dashboard) and **sent automatically** when the connection returns. Other small changes, like marking notifications read, are also sent later.
+- **Needs a connection:** the MoMo phone prompt, and the very first sign-in on a device.
 
 ## Deploy
 

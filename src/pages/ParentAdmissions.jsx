@@ -4,6 +4,7 @@ import { CheckCircle2, FileUp, Plus, Send, Trash2, X } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { fmtDate, readFileAsDataURL, today, uid } from '../lib/utils';
 import { Badge, Button, Card, Empty, Field, Input, PageHeader, Select } from '../components/ui';
+import OutboxNotice from '../components/Outbox';
 
 const blankChild = () => ({ key: uid('k'), firstName: '', otherNames: '', lastName: '', gender: '', dob: '', classId: '', placeOfBirth: '', previousSchool: '', allergies: '', medicalNotes: '', documents: [] });
 export const APPLICATION_STATUS = { pending: ['amber', 'Under review'], accepted: ['green', 'Admitted'], rejected: ['red', 'Not accepted'] };
@@ -18,6 +19,7 @@ export default function ParentAdmissions() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(0);
+  const [queued, setQueued] = useState(false);
   const classes = [...db.classes].sort((a, b) => a.order - b.order);
   const apps = [...db.admissionApplications].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 
@@ -38,9 +40,10 @@ export default function ParentAdmissions() {
     setBusy(true);
     try {
       const ops = children.map(({ key, ...c }) => ({ t: 'put', c: 'admissionApplications', v: { ...c, id: uid('app') } }));
-      // Saved straight away (not queued) so any problem shows here; the server notifies the office.
-      await api.request('/api/ops', { method: 'POST', body: { ops } });
-      await api.reload();
+      // Sent now when online (the server notifies the office); offline, kept on the phone and sent later.
+      const r = await api.submit('/api/ops', { ops }, `Admission application for ${children.map((c) => c.firstName).join(', ')}`);
+      if (r.sent) await api.reload();
+      setQueued(!!r.queued);
       setSent(children.length);
       setChildren([{ ...blankChild(), lastName: surname }]);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -55,6 +58,7 @@ export default function ParentAdmissions() {
     <>
       <PageHeader title="Register children" subtitle={`Apply for admission to ${db.school.name}. Add all your children in one go — the school will review each one.`} />
 
+      <OutboxNotice />
       {params.get('welcome') && !apps.length && !sent && (
         <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900">
           <b>Welcome, {user.name.split(' ')[0]}!</b> Your account is ready. Fill in a form below for each child you want to register.
@@ -63,7 +67,9 @@ export default function ParentAdmissions() {
       {sent > 0 && (
         <div className="mb-6 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900">
           <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
-          <div className="flex-1"><b>{sent === 1 ? 'Application sent.' : `${sent} applications sent.`}</b> The school office will review {sent === 1 ? 'it' : 'them'} and you’ll be notified. Admitted children appear on your dashboard with their registration number.</div>
+          <div className="flex-1">{queued
+            ? <><b>Saved on your phone.</b> You’re offline, so {sent === 1 ? 'this application' : `these ${sent} applications`} will be sent to the school automatically when you’re back online.</>
+            : <><b>{sent === 1 ? 'Application sent.' : `${sent} applications sent.`}</b> The school office will review {sent === 1 ? 'it' : 'them'} and you’ll be notified. Admitted children appear on your dashboard with their registration number.</>}</div>
           <button type="button" onClick={() => setSent(0)} aria-label="Dismiss"><X className="size-4" /></button>
         </div>
       )}

@@ -227,7 +227,7 @@ function NewSale({ notify, onDone }) {
       </Card>
       <Card title="Payment" className="h-fit">
         <div className="space-y-4">
-          <div className="flex items-baseline justify-between"><span className="text-sm text-slate-500">Total</span><span className="text-2xl font-extrabold tabular-nums">{money(total, db.school.currency)}</span></div>
+          <div className="flex items-baseline justify-between"><span className="text-sm text-slate-500">Total</span><span className="text-2xl font-bold tabular-nums">{money(total, db.school.currency)}</span></div>
           <Field label="Paid by"><Select value={method} onChange={(e) => setMethod(e.target.value)} options={PAYMENT_METHODS.map((m) => ({ value: m.id, label: m.label }))} /></Field>
           <Field label="Date"><Input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} /></Field>
           <Button className="w-full" icon={ShoppingCart} onClick={save} disabled={!student || !lines.length}>Complete sale</Button>

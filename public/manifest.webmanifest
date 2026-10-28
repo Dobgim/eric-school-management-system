@@ -1,14 +1,14 @@
 {
   "id": "/",
-  "name": "Bright Future School",
-  "short_name": "Bright Future",
+  "name": "School Information System",
+  "short_name": "School",
   "description": "School fees, receipts, results and news for parents — plus admissions, payroll and reports for staff.",
   "start_url": "/?source=app",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#131c52",
-  "theme_color": "#131c52",
+  "background_color": "#193327",
+  "theme_color": "#193327",
   "lang": "en",
   "categories": ["education", "finance"],
   "icons": [

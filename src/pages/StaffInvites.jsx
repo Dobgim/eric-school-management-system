@@ -74,7 +74,7 @@ export default function StaffInvites() {
         {created && (
           <div className="space-y-4 text-center">
             <p className="text-sm text-slate-600">Send this to {created.name || 'the staff member'}. It works once, until {fmtDate(created.expiresAt)}.</p>
-            <p className="rounded-xl bg-slate-50 py-4 font-mono text-3xl font-extrabold tracking-[0.2em] text-brand-900">{show(created.code)}</p>
+            <p className="rounded-xl bg-slate-50 py-4 font-mono text-3xl font-bold tracking-[0.2em] text-brand-900">{show(created.code)}</p>
             <p className="text-xs break-all text-slate-500">{inviteLink(created.code)}</p>
             <div className="flex flex-wrap justify-center gap-2">
               <Button variant="secondary" icon={Copy} onClick={() => copy(message(created))}>Copy message</Button>

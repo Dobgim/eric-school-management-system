@@ -2,8 +2,8 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable/es';
 import { fmtDate, fmtDateTime, money } from './utils';
 
-const BRAND = [26, 44, 134];
-const ACCENT = [245, 158, 11];
+const BRAND = [38, 76, 57];
+const ACCENT = [199, 134, 42];
 
 // Standard PDF fonts only cover Latin-1; normalise the few characters we use that fall outside it.
 const clean = (v) =>
@@ -97,7 +97,7 @@ export function exportTablePDF({ school, title, subtitle, columns, rows, summary
     body: rows.map((r) => columns.map((c) => clean(c.format ? c.format(r[c.key], r) : r[c.key]))),
     styles: { fontSize: 8, cellPadding: 2 },
     headStyles: { fillColor: BRAND, textColor: 255, fontStyle: 'bold' },
-    alternateRowStyles: { fillColor: [245, 247, 252] },
+    alternateRowStyles: { fillColor: [248, 245, 238] },
     columnStyles: Object.fromEntries(columns.map((c, i) => [i, { halign: c.align || 'left' }])),
     margin: { left: 14, right: 14, bottom: 16 },
   });
@@ -129,7 +129,7 @@ export function exportExcel({ title, columns, rows, filename, summary }) {
 <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
 <Styles>
  <Style ss:ID="title"><Font ss:Bold="1" ss:Size="14"/></Style>
- <Style ss:ID="head"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#1A2C86" ss:Pattern="Solid"/></Style>
+ <Style ss:ID="head"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#264C39" ss:Pattern="Solid"/></Style>
  <Style ss:ID="bold"><Font ss:Bold="1"/></Style>
 </Styles>
 <Worksheet ss:Name="${xmlEscape(title.slice(0, 31).replace(/[\\/?*[\]:]/g, ' '))}">
@@ -171,7 +171,7 @@ export function receiptPDF({ school, payment, student, className, term, lines, s
     margin: { left: 14, right: 14 },
   });
   y = doc.lastAutoTable.finalY + 3;
-  doc.setFillColor(238, 244, 255);
+  doc.setFillColor(237, 243, 238);
   doc.roundedRect(14, y, w - 28, 14, 2, 2, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
@@ -187,7 +187,7 @@ export function receiptPDF({ school, payment, student, className, term, lines, s
     foot: [['Term totals', money(status.billed, ''), money(status.paid, ''), money(status.balance, '')]],
     styles: { fontSize: 8, cellPadding: 1.6 },
     headStyles: { fillColor: BRAND },
-    footStyles: { fillColor: [230, 234, 245], textColor: 20 },
+    footStyles: { fillColor: [236, 232, 222], textColor: 20 },
     columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } },
     margin: { left: 14, right: 14 },
   });
@@ -215,7 +215,7 @@ export function payslipPDF({ school, staff, grade, item, month }) {
     startY: y,
     theme: 'grid',
     styles: { fontSize: 9, cellPadding: 2 },
-    columnStyles: { 0: { fontStyle: 'bold', fillColor: [245, 247, 252] }, 2: { fontStyle: 'bold', fillColor: [245, 247, 252] } },
+    columnStyles: { 0: { fontStyle: 'bold', fillColor: [248, 245, 238] }, 2: { fontStyle: 'bold', fillColor: [248, 245, 238] } },
     body: [
       ['Name', clean(`${staff.firstName} ${staff.lastName}`), 'Position', clean(staff.position)],
       ['Category', staff.category === 'teaching' ? 'Teaching' : 'Non-teaching', 'Salary scale', clean(grade?.name || '-')],
@@ -231,7 +231,7 @@ export function payslipPDF({ school, staff, grade, item, month }) {
     body: [['Basic salary', money(item.basic, '')], ['Housing allowance', money(item.housing, '')], ['Transport allowance', money(item.transport, '')], ['Bonus', money(item.bonus, '')]],
     foot: [['Gross pay', money(item.gross, '')]],
     headStyles: { fillColor: BRAND },
-    footStyles: { fillColor: [230, 234, 245], textColor: 20 },
+    footStyles: { fillColor: [236, 232, 222], textColor: 20 },
     columnStyles: { 1: { halign: 'right' } },
     styles: { fontSize: 9 },
     tableWidth: half,
@@ -242,8 +242,8 @@ export function payslipPDF({ school, staff, grade, item, month }) {
     head: [['Deductions', 'Amount']],
     body: [['CNPS (pension)', money(item.cnps, '')], ['Salary advance', money(item.advance, '')], ['Other deductions', money(item.otherDeductions, '')]],
     foot: [['Total deductions', money(item.cnps + item.advance + item.otherDeductions, '')]],
-    headStyles: { fillColor: [180, 40, 40] },
-    footStyles: { fillColor: [250, 235, 235], textColor: 20 },
+    headStyles: { fillColor: [147, 52, 42] },
+    footStyles: { fillColor: [249, 236, 234], textColor: 20 },
     columnStyles: { 1: { halign: 'right' } },
     styles: { fontSize: 9 },
     tableWidth: half,

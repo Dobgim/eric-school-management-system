@@ -9,6 +9,7 @@ import { Progress } from '../components/Charts';
 import { visibleAnnouncements } from './Announcements';
 import { myChildren } from './Portal';
 import { InstallCard } from '../components/InstallApp';
+import OutboxNotice from '../components/Outbox';
 
 export const REQUEST_STATUS = {
   pending: ['amber', 'Awaiting verification'],
@@ -38,13 +39,14 @@ export default function ParentDashboard() {
   return (
     <>
       <PageHeader title={`Welcome, ${user.name}`} subtitle={`${term.label} · ${db.school.name}`} />
+      <OutboxNotice />
       <InstallCard schoolName={db.school.shortName || db.school.name} />
 
       {owing - pending > 0 && (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-brand-800 to-brand-600 px-6 py-5 text-white shadow-sm">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-lg border-l-4 border-accent-400 bg-brand-900 px-6 py-5 text-white">
           <div>
             <p className="text-sm text-brand-100">Fees outstanding for your {active.length > 1 ? 'children' : 'child'}</p>
-            <p className="mt-0.5 text-3xl font-extrabold tabular-nums">{money(owing - pending, cur)}</p>
+            <p className="mt-0.5 font-display text-3xl font-semibold tabular-nums">{money(owing - pending, cur)}</p>
             {pending > 0 && <p className="mt-1 text-xs text-brand-100">{money(pending, cur)} more is awaiting verification by the bursar.</p>}
           </div>
           <Link to="/portal/pay"><Button variant="secondary" icon={Smartphone} className="border-0 !bg-accent-400 !text-slate-900 hover:!bg-accent-500">Pay fees now</Button></Link>
@@ -158,7 +160,7 @@ export default function ParentDashboard() {
                   <li key={e.id} className="flex gap-3">
                     <div className="grid w-12 shrink-0 place-items-center rounded-lg bg-brand-50 py-1 text-center text-brand-800">
                       <span className="text-[10px] font-bold uppercase">{new Date(e.date).toLocaleDateString('en-GB', { month: 'short' })}</span>
-                      <span className="text-lg leading-none font-extrabold">{new Date(e.date).getDate()}</span>
+                      <span className="text-lg leading-none font-bold">{new Date(e.date).getDate()}</span>
                     </div>
                     <div className="text-sm"><p className="font-semibold text-slate-800">{e.title}</p>{e.endDate && <p className="text-xs text-slate-500">until {fmtDate(e.endDate)}</p>}</div>
                   </li>

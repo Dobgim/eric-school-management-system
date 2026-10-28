@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
   AlertTriangle, BarChart3, BookOpenCheck, Building2, ClipboardList, GraduationCap, LayoutDashboard, LogOut,
-  Megaphone, Menu, Smartphone, UserPlus, Package, Receipt, Settings2, ShieldCheck, Users, UserRound, Wallet, X, ArrowUpCircle, Home, Contact,
+  CloudOff, Megaphone, Menu, Smartphone, UserPlus, Package, Receipt, Settings2, ShieldCheck, Users, UserRound, Wallet, X, ArrowUpCircle, Home, Contact,
 } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { can } from '../lib/permissions';
 import { currentTerm } from '../lib/finance';
-import { ROLES } from '../lib/utils';
+import { ROLES, fmtDateTime } from '../lib/utils';
 import { Avatar } from './ui';
 import NotificationBell from './NotificationBell';
 import { InstallButton, UpdateBanner } from './InstallApp';
@@ -17,9 +17,9 @@ export function Logo({ school, size = 'md' }) {
   if (school.logo) return <img src={school.logo} alt="" className={`${s} shrink-0 rounded-xl bg-white object-contain p-0.5`} />;
   return (
     <svg viewBox="0 0 64 64" className={`${s} shrink-0`} aria-hidden="true">
-      <path d="M32 4 8 12v18c0 15 10 25 24 30 14-5 24-15 24-30V12L32 4z" fill="#1a2c86" stroke="#fbbf24" strokeWidth="2" />
-      <path d="M32 15l13 7H19z" fill="#fbbf24" />
-      <path d="M18 26h28v3H18zM21 32h22l-2 14H23z" fill="#fbbf24" />
+      <path d="M32 4 8 12v18c0 15 10 25 24 30 14-5 24-15 24-30V12L32 4z" fill="#264c39" stroke="#e2a43b" strokeWidth="2" />
+      <path d="M32 15l13 7H19z" fill="#e2a43b" />
+      <path d="M18 26h28v3H18zM21 32h22l-2 14H23z" fill="#e2a43b" />
     </svg>
   );
 }
@@ -84,8 +84,8 @@ function ParentTabBar() {
         >
           {({ isActive }) => (
             <>
-              <span className={t.primary ? `-mt-6 grid size-12 place-items-center rounded-full shadow-lg ring-4 ring-white ${isActive ? 'bg-brand-800' : 'bg-brand-700'} text-white` : 'grid h-6 place-items-center'}>
-                <t.icon className={t.primary ? 'size-5' : 'size-5'} />
+              <span className={`grid h-7 w-12 place-items-center rounded-md ${t.primary ? 'bg-accent-400 text-brand-950' : isActive ? 'bg-brand-50' : ''}`}>
+                <t.icon className="size-5" />
               </span>
               {t.label}
             </>
@@ -105,7 +105,7 @@ export const allowed = (user, perm) => {
 };
 
 export default function Layout() {
-  const { db, user, logout, saveError, offline } = useStore();
+  const { db, user, logout, saveError, offline, cachedAt } = useStore();
   const [open, setOpen] = useState(false);
   const term = currentTerm(db);
 
@@ -114,7 +114,7 @@ export default function Layout() {
       <div className="flex items-center gap-3 px-5 py-5">
         <Logo school={db.school} />
         <div className="min-w-0">
-          <p className="truncate text-sm leading-tight font-extrabold text-white">{db.school.shortName || db.school.name}</p>
+          <p className="truncate text-sm leading-tight font-bold text-white">{db.school.shortName || db.school.name}</p>
           <p className="truncate text-xs text-brand-300 italic">{db.school.motto}</p>
         </div>
       </div>
@@ -132,7 +132,7 @@ export default function Layout() {
                   end={i.end}
                   onClick={() => setOpen(false)}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${isActive ? 'bg-white/10 text-white' : 'text-brand-200 hover:bg-white/5 hover:text-white'}`}
+                    `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition ${isActive ? 'bg-white/[0.07] text-white shadow-[inset_3px_0_0_var(--color-accent-400)]' : 'text-brand-200 hover:bg-white/5 hover:text-white'}`}
                 >
                   <i.icon className="size-4.5 shrink-0" />
                   <span className="flex-1">{i.label}</span>
@@ -184,7 +184,12 @@ export default function Layout() {
             </div>
           </div>
         </header>
-        {offline && <div className="no-print bg-amber-500 px-4 py-2 text-center text-sm font-semibold text-slate-900">You’re offline — showing the last saved data. Changes can’t be saved until you reconnect.</div>}
+        {offline && (
+          <div className="no-print flex items-center justify-center gap-2 bg-accent-400 px-4 py-2 text-center text-sm font-medium text-brand-950">
+            <CloudOff className="size-4 shrink-0" />
+            <span>Offline — showing information saved {cachedAt ? fmtDateTime(cachedAt) : 'earlier'}. {user.role === 'parent' ? 'Anything you submit is kept on this phone and sent when you reconnect.' : 'Changes will be sent when you reconnect.'}</span>
+          </div>
+        )}
         {saveError && <div className="no-print sticky top-[61px] z-20 bg-rose-600 px-4 py-2 text-center text-sm font-medium text-white">{saveError}</div>}
         <main className={`mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:py-8 ${user.role === 'parent' ? 'pb-28 lg:pb-8' : ''}`}>
           <Outlet />

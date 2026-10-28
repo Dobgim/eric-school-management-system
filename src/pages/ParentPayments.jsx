@@ -10,6 +10,7 @@ import { Badge, Button, Card, DataTable, Empty, PageHeader, Select, Tabs } from 
 import { AnnouncementList, visibleAnnouncements } from './Announcements';
 import { REQUEST_STATUS } from './ParentDashboard';
 import { Calendar, myChildren } from './Portal';
+import OutboxNotice from '../components/Outbox';
 
 export default function ParentPayments() {
   const { db, user } = useStore();
@@ -47,6 +48,7 @@ export default function ParentPayments() {
         subtitle="Every payment made for your children, with official receipts."
         actions={<><Button variant="secondary" icon={FileText} onClick={statement}>Download statement</Button><Link to="/portal/pay"><Button icon={Smartphone}>Pay fees</Button></Link></>}
       />
+      <OutboxNotice />
       <Tabs
         tabs={[{ id: 'receipts', label: 'Receipts', count: payments.length }, { id: 'requests', label: 'Submitted payments', count: requests.filter((r) => r.status === 'pending').length || undefined }]}
         value={tab}

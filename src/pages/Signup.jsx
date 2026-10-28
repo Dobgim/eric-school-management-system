@@ -84,7 +84,7 @@ export default function Signup() {
       <Shell school={school}>
         <div className="text-center">
           <div className="mx-auto grid size-16 place-items-center rounded-full bg-amber-50 text-amber-600"><Clock className="size-8" /></div>
-          <h2 className="mt-4 text-2xl font-extrabold text-slate-900">Request sent</h2>
+          <h2 className="mt-4 text-2xl font-bold text-slate-900">Request sent</h2>
           <p className="mt-2 text-slate-600">We couldn’t match your details to a pupil automatically, so the school office will confirm which children are yours. You can sign in with your phone number and password as soon as it’s approved.</p>
           <Link to="/"><Button className="mt-6">Back to sign in</Button></Link>
         </div>
@@ -95,7 +95,7 @@ export default function Signup() {
   return (
     <Shell school={school}>
       <Link to="/" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-slate-800"><ArrowLeft className="size-4" />Back to sign in</Link>
-      <h2 className="mt-4 text-2xl font-extrabold text-slate-900">{type === 'parent' ? 'Create a parent account' : 'Join as a member of staff'}</h2>
+      <h2 className="mt-4 text-2xl font-bold text-slate-900">{type === 'parent' ? 'Create a parent account' : 'Join as a member of staff'}</h2>
       <p className="mt-1 text-sm text-slate-500">{type === 'parent' ? 'For parents and guardians.' : 'Staff accounts need an invitation from the school.'}</p>
       {serverProblem && <p role="alert" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"><b>Can’t reach the school server.</b> {serverProblem}</p>}
 
@@ -182,7 +182,7 @@ function Shell({ school, children }) {
       <div className="w-full max-w-xl">
         <div className="mb-6 flex items-center justify-center gap-3">
           <Logo school={school} />
-          <p className="font-extrabold text-slate-900">{school.name}</p>
+          <p className="font-bold text-slate-900">{school.name}</p>
         </div>
         <div className="card p-6 sm:p-8">{children}</div>
       </div>

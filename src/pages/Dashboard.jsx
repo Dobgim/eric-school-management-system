@@ -8,7 +8,7 @@ import { fmtDate, fullName, methodLabel, money, monthLabel, num, sum, today } fr
 import { Badge, Card, DataTable, PageHeader, StatCard } from '../components/ui';
 import { BarChart, Donut, HBarChart, Progress } from '../components/Charts';
 
-const METHOD_COLORS = { cash: '#16a34a', mtn: '#f5b800', orange: '#f97316', bank: '#1e46ed' };
+const METHOD_COLORS = { cash: '#3f7356', mtn: '#e2b23b', orange: '#c9662a', bank: '#48433a' };
 
 export default function Dashboard() {
   const { db, user } = useStore();
@@ -74,7 +74,7 @@ export default function Dashboard() {
           <Card title="Enrolment by class" className="xl:col-span-2"><BarChart data={data.enrolment.map((e) => ({ ...e, label: e.label.replace('Nursery', 'Nur.').replace('Pre-Nur.', 'Pre-N') }))} /></Card>
         )}
         <Card title="Gender distribution">
-          <Donut data={[{ label: 'Boys', value: data.boys, color: '#1e46ed' }, { label: 'Girls', value: data.girls, color: '#ec4899' }]} center={{ value: data.active.length, label: 'pupils' }} />
+          <Donut data={[{ label: 'Boys', value: data.boys, color: '#2f5d45' }, { label: 'Girls', value: data.girls, color: '#c7862a' }]} center={{ value: data.active.length, label: 'pupils' }} />
         </Card>
       </div>
 
@@ -140,7 +140,7 @@ export default function Dashboard() {
                   <li key={e.id} className="flex gap-3">
                     <div className="grid w-12 shrink-0 place-items-center rounded-lg bg-brand-50 py-1 text-center text-brand-800">
                       <span className="text-[10px] font-bold uppercase">{new Date(e.date).toLocaleDateString('en-GB', { month: 'short' })}</span>
-                      <span className="text-lg leading-none font-extrabold">{new Date(e.date).getDate()}</span>
+                      <span className="text-lg leading-none font-bold">{new Date(e.date).getDate()}</span>
                     </div>
                     <div className="min-w-0 text-sm">
                       <p className="font-semibold text-slate-800">{e.title}</p>

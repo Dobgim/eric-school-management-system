@@ -5,7 +5,6 @@ import { useStore } from '../lib/store';
 import { feeStatus, pendingFor } from '../lib/finance';
 import { downloadReceipt } from '../lib/documents';
 import { OPERATORS, detectOperator, normalizePhone } from '../lib/momo';
-import { nextRequestRef } from '../lib/payments';
 import { fmtDate, fullName, methodLabel, money, readFileAsDataURL, sum, today, uid } from '../lib/utils';
 import { Avatar, Badge, Button, Card, Empty, Field, Input, PageHeader, Select, Textarea } from '../components/ui';
 import { myChildren } from './Portal';
@@ -78,7 +77,7 @@ export default function PayFees() {
           </ul>
           <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-5 py-4">
             <span className="font-semibold text-slate-600">Total to pay</span>
-            <span className="text-2xl font-extrabold text-slate-900 tabular-nums">{money(total, cur)}</span>
+            <span className="text-2xl font-bold text-slate-900 tabular-nums">{money(total, cur)}</span>
           </div>
         </Card>
 
@@ -97,7 +96,7 @@ export default function PayFees() {
 }
 
 function PromptPay({ items, total, defaultPhone, onDone }) {
-  const { db, api, user } = useStore();
+  const { db, api, offline } = useStore();
   const cur = db.school.currency;
   const [phone, setPhone] = useState(normalizePhone(defaultPhone));
   const [operator, setOperator] = useState(detectOperator(defaultPhone) || 'mtn');
@@ -157,7 +156,8 @@ function PromptPay({ items, total, defaultPhone, onDone }) {
         </div>
       </Field>
       {error && <p className="flex gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700"><XCircle className="mt-0.5 size-4 shrink-0" />{error}</p>}
-      <Button className="w-full py-3" icon={Smartphone} disabled={!total} onClick={pay}>{state === 'failed' ? 'Try again' : `Pay ${money(total, cur)}`}</Button>
+      {offline && <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">The phone prompt needs internet. You’re offline — use <b>“I’ve already paid”</b> after paying with *126# / #150#; it will be sent when you’re back online.</p>}
+      <Button className="w-full py-3" icon={Smartphone} disabled={!total || offline} onClick={pay}>{state === 'failed' ? 'Try again' : `Pay ${money(total, cur)}`}</Button>
       {demo && (
         <p className="flex gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
           <InfoIcon className="mt-0.5 size-4 shrink-0" />
@@ -193,23 +193,23 @@ function ManualPay({ items, total, defaultPhone, onDone }) {
     const ref = f.reference.trim().toLowerCase();
     if (db.payments.some((p) => p.reference?.toLowerCase() === ref) || db.paymentRequests.some((r) => r.status !== 'rejected' && r.reference?.toLowerCase() === ref)) return setError('This transaction ID has already been used.');
     setBusy(true);
-    let request;
+    // The server numbers the request; offline, it is kept on the phone and sent when the connection returns.
+    const request = {
+      id: uid('rq'), channel: 'manual', status: 'pending', method: f.method,
+      guardianId: user.guardianId, userId: user.id, payerPhone: f.payerPhone, reference: f.reference.trim(), paidOn: f.paidOn,
+      proof: f.proof, proofName: f.proofName, note: f.note, items, amount: total, createdAt: new Date().toISOString(),
+    };
+    let result;
     try {
-      request = {
-        id: uid('rq'), ref: await nextRequestRef(api), channel: 'manual', status: 'pending', method: f.method,
-        guardianId: user.guardianId, userId: user.id, payerPhone: f.payerPhone, reference: f.reference.trim(), paidOn: f.paidOn,
-        proof: f.proof, proofName: f.proofName, note: f.note, items, amount: total, createdAt: new Date().toISOString(),
-      };
-      // Saved straight away (not queued) so the parent sees any problem; the server also alerts the bursar.
-      await api.request('/api/ops', { method: 'POST', body: { ops: [{ t: 'put', c: 'paymentRequests', v: request }] } });
-      await api.reload();
+      result = await api.submit('/api/ops', { ops: [{ t: 'put', c: 'paymentRequests', v: request }] }, `${money(total, cur)} paid by ${methodLabel(f.method)} (${request.reference})`);
+      if (result.sent) await api.reload();
     } catch (e) {
       setBusy(false);
       return setError(e.message);
     }
     setBusy(false);
-    api.log('Submitted payment for verification', `${user.name} — ${money(total, cur)} via ${methodLabel(f.method)} (${request.reference})`);
-    onDone({ kind: 'manual', request });
+    if (result.sent) api.log('Submitted payment for verification', `${user.name} — ${money(total, cur)} via ${methodLabel(f.method)} (${request.reference})`);
+    onDone({ kind: 'manual', request, queued: !!result.queued });
   };
 
   const account = f.method === 'mtn'
@@ -253,11 +253,13 @@ function Done({ result, onAgain }) {
     <div className="mx-auto max-w-xl">
       <div className="card p-8 text-center">
         <div className={`mx-auto grid size-16 place-items-center rounded-full ${online ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}><CheckCircle2 className="size-9" /></div>
-        <h1 className="mt-4 text-2xl font-extrabold text-slate-900">{online ? 'Payment successful' : 'Payment submitted'}</h1>
+        <h1 className="mt-4 text-2xl font-bold text-slate-900">{online ? 'Payment successful' : result.queued ? 'Saved on your phone' : 'Payment submitted'}</h1>
         <p className="mt-1 text-slate-600">
           {online
             ? <>{money(result.total, cur)} paid with {OPERATORS[result.operator].label}. Transaction <span className="font-mono">{result.transactionId}</span>.</>
-            : <>{money(result.request.amount, cur)} is awaiting verification by the bursar (reference {result.request.ref}). Your receipt will appear once it’s confirmed.</>}
+            : result.queued
+              ? <>You’re offline, so the {money(result.request.amount, cur)} payment (transaction {result.request.reference}) is kept on this phone. It will be sent to the school automatically as soon as you’re back online.</>
+              : <>{money(result.request.amount, cur)} is awaiting verification by the bursar (reference {db.paymentRequests.find((r) => r.id === result.request.id)?.ref || result.request.reference}). Your receipt will appear once it’s confirmed.</>}
         </p>
         {online && (
           <ul className="mt-6 divide-y divide-slate-100 rounded-xl border border-slate-200 text-left">
@@ -278,7 +280,7 @@ function Done({ result, onAgain }) {
           <Link to="/portal/payments"><Button variant="secondary">Payments & receipts</Button></Link>
           <Button onClick={onAgain}>Make another payment</Button>
         </div>
-        {!online && <p className="mt-4"><Badge tone="amber">Awaiting verification</Badge></p>}
+        {!online && <p className="mt-4"><Badge tone="amber">{result.queued ? 'Waiting for internet' : 'Awaiting verification'}</Badge></p>}
       </div>
     </div>
   );

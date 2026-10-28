@@ -72,6 +72,12 @@ const readCache = () => { try { return JSON.parse(localStorage.getItem(CACHE_KEY
 const writeCache = (user, db) => { try { localStorage.setItem(CACHE_KEY, JSON.stringify({ user, db, at: new Date().toISOString() })); } catch { /* storage full or blocked */ } };
 const clearCache = () => { try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ } };
 
+// Outbox: things a parent submits while offline (payments to verify, admission applications) are kept on the
+// phone and sent automatically when the connection returns. Items are tagged with the user who made them.
+const OUTBOX_KEY = 'sis:outbox:v1';
+const readOutbox = () => { try { return JSON.parse(localStorage.getItem(OUTBOX_KEY)) || []; } catch { return []; } };
+const writeOutbox = (list) => { try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(list)); } catch { /* storage full or blocked */ } };
+
 export function StoreProvider({ children }) {
   const [status, setStatus] = useState('loading'); // loading | anon | ready
   const [user, setUser] = useState(null);
@@ -79,6 +85,9 @@ export function StoreProvider({ children }) {
   const [offline, setOffline] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [serverProblem, setServerProblem] = useState('');
+  const [cachedAt, setCachedAt] = useState(() => readCache()?.at || null);
+  const [outbox, setOutbox] = useState(readOutbox);
+  const sendingOutbox = useRef(false);
   const [publicSchool, setPublicSchool] = useState(() => readCache()?.db?.school || { name: 'School Information System', motto: '' });
   const dbRef = useRef(null);
   const userRef = useRef(null);
@@ -97,6 +106,7 @@ export function StoreProvider({ children }) {
     dbRef.current = d;
     setDb(d);
     writeCache(u, d);
+    setCachedAt(new Date().toISOString());
   }, []);
 
   const reload = useCallback(async () => {
@@ -189,7 +199,14 @@ export function StoreProvider({ children }) {
           await request('/api/ops', { method: 'POST', body: { ops, clientId: CLIENT_ID } });
           if (ops.some((o) => o.c === 'users')) stale.current = true;
         } catch (e) {
-          showError(e.status === 0 ? 'Not saved — you are offline. Reconnect and try again.' : `Not saved: ${e.message}`);
+          if (e.status === 0) {
+            // Offline: keep the changes and send them when the connection returns.
+            queue.current.unshift(...ops);
+            setOffline(true);
+            flushing.current = null; // `finally` below still releases inFlight
+            return;
+          }
+          showError(`Not saved: ${e.message}`);
           queue.current = [];
           stale.current = true;
         } finally {
@@ -200,6 +217,43 @@ export function StoreProvider({ children }) {
       if (stale.current) { stale.current = false; reload(); }
     });
   }, [reload, showError]);
+
+  // Send what the parent saved while offline (oldest first). Stops at the first network failure.
+  const flushOutbox = useCallback(async () => {
+    const u = userRef.current;
+    if (!u || sendingOutbox.current) return;
+    sendingOutbox.current = true;
+    let sent = 0;
+    try {
+      for (const item of readOutbox().filter((i) => i.userId === u.id)) {
+        try {
+          await request(item.path, { method: 'POST', body: item.body });
+          sent++;
+        } catch (e) {
+          if (e.status === 0) break;
+          showError(`Couldn’t send “${item.label}”: ${e.message}`);
+        }
+        const rest = readOutbox().filter((i) => i.id !== item.id);
+        writeOutbox(rest);
+        setOutbox(rest);
+      }
+    } finally {
+      sendingOutbox.current = false;
+    }
+    if (sent) reload();
+  }, [reload, showError]);
+
+  // Follow the phone's connection: catch up and send waiting items as soon as it is back.
+  useEffect(() => {
+    if (!user) return;
+    const online = () => { setOffline(false); reload(); flush(); flushOutbox(); };
+    const offlineNow = () => setOffline(true);
+    window.addEventListener('online', online);
+    window.addEventListener('offline', offlineNow);
+    if (navigator.onLine) flushOutbox();
+    else setOffline(true);
+    return () => { window.removeEventListener('online', online); window.removeEventListener('offline', offlineNow); };
+  }, [user, reload, flush, flushOutbox]);
 
   const mutate = useCallback((fn) => {
     const prev = dbRef.current;
@@ -255,6 +309,23 @@ export function StoreProvider({ children }) {
     log(action, details = '') {
       mutate((d) => { d.activityLog.unshift({ id: uid('lg'), userId: userRef.current?.id, action, details, at: new Date().toISOString() }); return d; });
     },
+    /**
+     * POST something the user submits (e.g. a payment to verify). Offline, it is kept on the device and sent
+     * automatically later: resolves { queued: true } instead of failing.
+     */
+    async submit(path, body, label) {
+      try {
+        return { sent: true, res: await request(path, { method: 'POST', body }) };
+      } catch (e) {
+        if (e.status !== 0) throw e;
+        const item = { id: uid('ob'), userId: userRef.current?.id, path, body, label, createdAt: new Date().toISOString() };
+        const list = [...readOutbox(), item];
+        writeOutbox(list);
+        setOutbox(list);
+        setOffline(true);
+        return { queued: true };
+      }
+    },
     mutate,
     reload,
     request,
@@ -291,7 +362,7 @@ export function StoreProvider({ children }) {
   }, []);
 
   const school = db?.school || publicSchool;
-  const value = useMemo(() => ({ db, user, api, login, logout, enter, saveError, offline, status, school, serverProblem }), [db, user, api, login, logout, enter, saveError, offline, status, school, serverProblem]);
+  const value = useMemo(() => ({ db, user, api, login, logout, enter, saveError, offline, status, school, serverProblem, cachedAt, outbox: outbox.filter((i) => i.userId === user?.id) }), [db, user, api, login, logout, enter, saveError, offline, status, school, serverProblem, cachedAt, outbox]);
 
   if (status === 'loading') {
     return (
