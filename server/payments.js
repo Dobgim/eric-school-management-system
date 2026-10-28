@@ -157,7 +157,7 @@ async function settle(conn, request, broadcast) {
       body: `${kids} · ${r.scopeLabel} · ${OPERATOR[r.method] || r.method} · ${result.reference}`,
     }, 'system');
     await put(q, 'notifications', {
-      id: newId('nt'), userIds: [r.userId], roles: [], kind: 'confirmed', link: '/portal/payments', readBy: [], createdAt: now,
+      id: newId('nt'), userIds: [r.userId], roles: [], kind: 'confirmed', sms: 'payment', link: '/portal/payments', readBy: [], createdAt: now,
       title: `Payment received: ${fmt(r.amount)}`, body: `${kids} · ${r.scopeLabel}. Your receipts are ready.`,
     }, 'system');
     await put(q, 'activityLog', { id: newId('lg'), userId: r.userId, action: 'Paid fees online', details: `${fmt(r.amount)} for ${r.scopeLabel} via ${r.method} (${result.reference})`, at: now }, 'system');

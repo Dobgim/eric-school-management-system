@@ -38,6 +38,7 @@ import Teachers from './pages/Teachers';
 import FeeStatus from './pages/FeeStatus';
 import Attendance from './pages/Attendance';
 import Expenses from './pages/Expenses';
+import Timetable from './pages/Timetable';
 
 function Guard({ perm, children }) {
   const { user } = useStore();
@@ -71,6 +72,7 @@ export default function App() {
         <Route path="academics" element={g('academics.edit', <Academics />)} />
         <Route path="attendance" element={g(['myclass', 'students.edit'], <Attendance />)} />
         <Route path="expenses" element={g('payroll', <Expenses />)} />
+        <Route path="timetable" element={g(['myclass', 'academics.edit', 'students.edit'], <Timetable />)} />
         <Route path="promotion" element={g('promotion', <Promotion />)} />
         <Route path="fees" element={g('fees.view', <Fees />)} />
         <Route path="fees/online" element={g('fees.collect', <PaymentRequests />)} />

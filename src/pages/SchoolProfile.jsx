@@ -8,6 +8,8 @@ import { fmtDate, fmtDateTime, readFileAsDataURL } from '../lib/utils';
 import { Logo } from '../components/Layout';
 import { Badge, Button, Card, Confirm, DataTable, Field, Info, Input, Modal, PageHeader, Select, StatCard, Tabs, Textarea, useToast } from '../components/ui';
 import PaymentAccount from '../components/PaymentAccount';
+import RestoreBackup from '../components/RestoreBackup';
+import SmsSettings from '../components/SmsSettings';
 
 export default function SchoolProfile() {
   const { db, user } = useStore();
@@ -360,6 +362,7 @@ function SettingsTab() {
         </div>
       </Card>
       <PaymentAccount />
+      <SmsSettings />
       <Card title="Accounts for payments made outside the app" className="lg:row-span-2">
         <p className="mb-4 text-sm text-slate-600">Only for parents who already paid by USSD or at the bank and then submit the transaction ID (“I’ve already paid”). Parents paying by phone prompt don’t need these.</p>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -391,6 +394,7 @@ function SettingsTab() {
         })()}
         <div className="mt-3 flex flex-wrap gap-2">
           {user.role === 'superadmin' && <Button variant="secondary" onClick={() => { window.location.href = '/api/backup'; setTimeout(() => api.reload(), 2500); }}>Download full backup</Button>}
+          {user.role === 'superadmin' && <RestoreBackup />}
         </div>
         <p className="mt-3 text-xs text-slate-500">Data is stored in the school database on the server. The backup is a JSON copy for your records; to wipe everything and start fresh, run <code>npm run db:reset -- --yes</code> on the server.</p>
       </Card>

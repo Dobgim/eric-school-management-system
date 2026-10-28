@@ -1,5 +1,6 @@
 import { allTerms, allocate, billLines, feeStatus, termById } from './finance';
-import { payslipPDF, receiptPDF, reportCardsPDF } from './exporters';
+import { payslipPDF, receiptPDF, reportCardsPDF, timetablePDF } from './exporters';
+import { DAYS } from './timetable';
 import { classSubjects } from './subjects';
 import { feeTypeLabel, methodLabel, monthLabel } from './utils';
 
@@ -55,4 +56,23 @@ export function downloadReportCards(db, records, filename) {
     return { student, className: cls?.name || '', term: term?.label || '', record: r, subjects, teacherName: teacher ? `${teacher.firstName} ${teacher.lastName}` : '', nextTerm: next?.start };
   }).filter((c) => c.student);
   if (cards.length) reportCardsPDF({ school: db.school, cards, filename });
+}
+
+/** PDF of a class timetable, or (with `teacher`) of one teacher's week. */
+export function exportTimetable(db, tt, teacher) {
+  const short = (id) => { const s = db.staff.find((x) => x.id === id); return s ? `${s.firstName[0]}. ${s.lastName}` : ''; };
+  const days = DAYS.map(([, label]) => label);
+  if (teacher) {
+    // One row per distinct time slot the teacher has a lesson in.
+    const slots = [...new Map(teacher.lessons.map((l) => [`${l.period.start}-${l.period.end}`, l.period])).values()].sort((a, b) => a.start.localeCompare(b.start));
+    const rows = slots.map((p) => ({ time: `${p.start}-${p.end}`, kind: 'lesson', cells: DAYS.map(([d]) => teacher.lessons.filter((l) => l.day === d && l.period.start === p.start).map((l) => `${l.subject} - ${db.classes.find((c) => c.id === l.classId)?.name || ''}`).join(' / ')) }));
+    return timetablePDF({ school: db.school, title: 'TEACHER TIMETABLE', subtitle: teacher.name, days, rows, filename: `Timetable - ${teacher.name}` });
+  }
+  const cls = db.classes.find((c) => c.id === tt.classId);
+  const rows = tt.periods.map((p, i) => ({
+    time: `${p.start}-${p.end}`, kind: p.kind, label: p.label,
+    cells: DAYS.map(([d]) => { const c = tt.cells?.[`${d}-${i}`]; return c?.subject ? `${c.subject}${c.teacherId ? `
+${short(c.teacherId)}` : ''}` : ''; }),
+  }));
+  return timetablePDF({ school: db.school, title: 'CLASS TIMETABLE', subtitle: cls?.name, days, rows, filename: `Timetable - ${cls?.name}` });
 }

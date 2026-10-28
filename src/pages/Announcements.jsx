@@ -62,9 +62,10 @@ export default function Announcements() {
     } catch (e) { return notify(e.message); }
     api.log(form.id ? 'Edited announcement' : 'Posted announcement', form.title);
     const phones = res?.push?.sent || 0;
+    const texts = res?.sms?.sent ? ` ${res.sms.sent} SMS sent.` : '';
     notify(form.id ? 'Announcement saved.'
-      : phones ? `${form.audience === 'personal' ? 'Message sent' : 'Posted'}. Delivered to ${phones} phone${phones > 1 ? 's' : ''} now, and shown on the bell in the app.`
-        : `${form.audience === 'personal' ? 'Message sent' : 'Posted'} and shown on the bell in the app. No phone received it: ${form.audience === 'personal' ? 'this parent has' : 'nobody it is for has'} turned on phone notifications yet.`);
+      : (phones ? `${form.audience === 'personal' ? 'Message sent' : 'Posted'}. Delivered to ${phones} phone${phones > 1 ? 's' : ''} now, and shown on the bell in the app.`
+        : `${form.audience === 'personal' ? 'Message sent' : 'Posted'} and shown on the bell in the app. No phone received it: ${form.audience === 'personal' ? 'this parent has' : 'nobody it is for has'} turned on phone notifications yet.`) + texts);
     loadStats();
     setForm(null);
   };
@@ -91,6 +92,9 @@ export default function Announcements() {
               <Field label="Send to"><Select value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })} options={Object.entries(AUDIENCE).map(([value, [, label]]) => ({ value, label }))} /></Field>
               <Field label="Date"><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></Field>
               <label className="flex items-center gap-2 pt-6 text-sm font-medium text-slate-700"><input type="checkbox" checked={!!form.pinned} onChange={(e) => setForm({ ...form, pinned: e.target.checked })} /> Pin to top</label>
+              {!form.id && db.settings.sms?.enabled && db.settings.sms?.for?.announcement && form.audience !== 'staff' && form.audience !== 'personal' && (
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 sm:col-span-3"><input type="checkbox" checked={!!form.sms} onChange={(e) => setForm({ ...form, sms: e.target.checked })} /> Also send by SMS to parents{db.settings.sms.onlyWithoutApp ? ' who don’t use the app' : ''} (charged per SMS)</label>
+              )}
             </div>
             {form.audience === 'personal' && <ParentPicker value={form.guardianIds || []} onChange={(guardianIds) => setForm({ ...form, guardianIds })} />}
           </div>

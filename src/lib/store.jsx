@@ -11,7 +11,7 @@ const COLLECTIONS = [
   'students', 'guardians', 'classes', 'facilities', 'sessions', 'calendarEvents', 'categories', 'feeItems',
   'payments', 'staff', 'salaryScales', 'salaryAdjustments', 'payrollRuns', 'inventory', 'stockMovements', 'sales',
   'academicRecords', 'promotionRecommendations', 'announcements', 'activityLog', 'paymentRequests', 'notifications', 'users',
-  'admissionApplications', 'invites', 'attendance', 'expenses',
+  'admissionApplications', 'invites', 'attendance', 'expenses', 'marks', 'timetables',
 ];
 const CACHE_KEY = 'sis:cache:v2';
 const CLIENT_ID = uid('client');

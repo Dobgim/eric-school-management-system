@@ -1,11 +1,12 @@
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarCheck, Download, GraduationCap, ShoppingBag, Smartphone, Wallet } from 'lucide-react';
+import { CalendarCheck, Clock, Download, GraduationCap, ShoppingBag, Smartphone, Wallet } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { allTerms, billLines, currentTerm, feeStatus, termPaid, termsUpTo } from '../lib/finance';
 import { downloadReceipt, downloadReportCards } from '../lib/documents';
 import { age, feeTypeLabel, fmtDate, fullName, methodLabel, money, today } from '../lib/utils';
 import { Avatar, Badge, Button, Card, DataTable, Empty, FeeBadge, Info, PageHeader, Tabs } from '../components/ui';
 import { Progress } from '../components/Charts';
+import { ClassTimetable } from './Timetable';
 
 export const myChildren = (db, user) =>
   db.students.filter((s) => s.guardianIds.includes(user.guardianId)).sort((a, b) => (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1));
@@ -41,12 +42,13 @@ export default function Portal() {
       )}
       {!child ? <Empty title="No children linked to your account" message="Contact the school office." /> : (
         <>
-          <Tabs tabs={[{ id: 'overview', label: 'Profile' }, { id: 'fees', label: 'Fees & receipts', icon: Wallet }, { id: 'purchases', label: 'Uniforms & materials', icon: ShoppingBag }, { id: 'results', label: 'Results', icon: GraduationCap }, { id: 'attendance', label: 'Attendance', icon: CalendarCheck }]} value={tab} onChange={setTab} />
+          <Tabs tabs={[{ id: 'overview', label: 'Profile' }, { id: 'fees', label: 'Fees & receipts', icon: Wallet }, { id: 'purchases', label: 'Uniforms & materials', icon: ShoppingBag }, { id: 'results', label: 'Results', icon: GraduationCap }, { id: 'attendance', label: 'Attendance', icon: CalendarCheck }, { id: 'timetable', label: 'Timetable', icon: Clock }]} value={tab} onChange={setTab} />
           {tab === 'overview' && <Overview child={child} />}
           {tab === 'fees' && <Fees child={child} />}
           {tab === 'purchases' && <Purchases child={child} />}
           {tab === 'results' && <Results child={child} />}
           {tab === 'attendance' && <Attendance child={child} />}
+          {tab === 'timetable' && <ClassTimetable classId={child.classId} />}
         </>
       )}
     </>

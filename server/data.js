@@ -2,12 +2,13 @@
 // and every change it sends is checked here before it reaches the database.
 import { randomBytes } from 'node:crypto';
 import { hashPassword, toClientUser } from './auth.js';
+import { classSubjects, weightedAverage } from '../src/lib/subjects.js';
 
 export const COLLECTIONS = [
   'students', 'guardians', 'classes', 'facilities', 'sessions', 'calendarEvents', 'categories', 'feeItems',
   'payments', 'staff', 'salaryScales', 'salaryAdjustments', 'payrollRuns', 'inventory', 'stockMovements', 'sales',
   'academicRecords', 'promotionRecommendations', 'announcements', 'activityLog', 'paymentRequests', 'notifications',
-  'admissionApplications', 'invites', 'attendance', 'expenses',
+  'admissionApplications', 'invites', 'attendance', 'expenses', 'marks', 'timetables',
 ];
 
 export const newId = (p = '') => p + Date.now().toString(36) + randomBytes(3).toString('hex');
@@ -65,6 +66,7 @@ export function viewFor(user, all) {
       sales: all.sales.filter((s) => kids.has(s.studentId)),
       academicRecords: all.academicRecords.filter((r) => kids.has(r.studentId)),
       paymentRequests: all.paymentRequests.filter((r) => r.guardianId === user.guardianId),
+      timetables: all.timetables.filter((t) => kidClassIds.has(t.classId)),
       // Daily registers of the children's classes, reduced to their own children.
       attendance: all.attendance.filter((a) => kidClassIds.has(a.classId)).map((a) => ({
         id: a.id, classId: a.classId, date: a.date, absent: (a.absent || []).filter((id) => kids.has(id)), late: (a.late || []).filter((id) => kids.has(id)),
@@ -97,14 +99,21 @@ export function viewFor(user, all) {
     const classId = teacherClassId(all, user);
     const pupils = all.students.filter((s) => s.classId === classId || Object.values(s.enrollments || {}).includes(classId));
     const ids = new Set(pupils.map((s) => s.id));
+    // Other classes where this teacher takes a subject: names only, to enter marks.
+    const taught = new Set(markClasses(all, user));
+    const others = all.students.filter((s) => !ids.has(s.id) && Object.values(s.enrollments || {}).some((c) => taught.has(c)))
+      .map(({ id, firstName, otherNames, lastName, regNo, classId: cid, enrollments, status, gender }) => ({ id, firstName, otherNames, lastName, regNo, classId: cid, enrollments, status, gender, guardianIds: [] }));
     const guardianIds = new Set(pupils.flatMap((s) => s.guardianIds || []));
     return {
       ...empty, ...base,
       settings: { ...all.settings, momo: undefined },
       facilities: all.facilities,
-      students: pupils,
+      students: [...pupils, ...others],
       guardians: all.guardians.filter((g) => guardianIds.has(g.id)),
       academicRecords: all.academicRecords.filter((r) => ids.has(r.studentId) || r.classId === classId),
+      marks: all.marks.filter((m) => m.classId === classId || taught.has(m.classId)),
+      // Own class's timetable, and every timetable where this teacher has a lesson.
+      timetables: all.timetables.filter((t) => t.classId === classId || Object.values(t.cells || {}).some((c) => c?.teacherId && c.teacherId === user.staffId)),
       attendance: all.attendance.filter((a) => a.classId === classId),
       promotionRecommendations: all.promotionRecommendations.filter((r) => ids.has(r.studentId)),
       announcements: all.announcements.filter((a) => a.audience === 'all' || a.audience === 'staff'),
@@ -127,7 +136,7 @@ export function viewFor(user, all) {
 
 // Collections each office role may change. Teachers and parents are handled row by row below.
 const WRITE = {
-  admin: ['students', 'guardians', 'classes', 'facilities', 'sessions', 'calendarEvents', 'academicRecords', 'promotionRecommendations', 'announcements', 'staff', 'notifications', 'activityLog', 'attendance'],
+  admin: ['students', 'guardians', 'classes', 'facilities', 'sessions', 'calendarEvents', 'academicRecords', 'promotionRecommendations', 'announcements', 'staff', 'notifications', 'activityLog', 'attendance', 'timetables'],
   bursar: ['payments', 'feeItems', 'categories', 'payrollRuns', 'salaryAdjustments', 'salaryScales', 'staff', 'inventory', 'stockMovements', 'sales', 'paymentRequests', 'notifications', 'activityLog', 'expenses'],
 };
 const KV_WRITE = { superadmin: ['school', 'settings'], admin: ['school', 'settings'] };
@@ -182,6 +191,8 @@ export async function applyOps(q, user, ops) {
     }
 
     if (c === 'users') { await writeUser(q, user, all, op); changed.add('users'); continue; }
+    if (c === 'marks' && op.t === 'put') { await writeMarks(all, user, op.v || {}, putRecord, now); continue; }
+    if (c === 'academicRecords' && op.t === 'put' && ['superadmin', 'admin', 'teacher'].includes(user.role)) { await writeResultDetails(all, user, op.v || {}, putRecord, now); continue; }
     if (!COLLECTIONS.includes(c)) throw new Invalid(`Unknown data type: ${c}`);
     const id = t === 'del' ? op.id : op.v?.id;
     if (!id || typeof id !== 'string') throw new Invalid('Record without an id.');
@@ -286,6 +297,107 @@ const STAFF_ROLES = ['superadmin', 'admin', 'bursar', 'teacher', 'staff'];
  * Save a class's register for one day and tell the parents of every pupil newly marked absent
  * (in the app and on their phone), so they know the same morning.
  */
+// ---------- Marks and term results ----------
+
+/** Classes where this user may enter marks: the office everywhere; a teacher in their own class and where they take a subject. */
+export function markClasses(all, user) {
+  if (['superadmin', 'admin'].includes(user.role)) return all.classes.map((c) => c.id);
+  if (user.role !== 'teacher') return [];
+  const me = all.staff.find((s) => s.id === user.staffId);
+  return [...new Set([teacherClassId(all, user), ...(me?.teaching || []).flatMap((t) => t.classIds || [])].filter(Boolean))];
+}
+
+/** May this user enter marks for this subject in this class? */
+function canEnterMarks(all, user, cls, subject) {
+  if (['superadmin', 'admin'].includes(user.role)) return true;
+  if (user.role !== 'teacher') return false;
+  if (cls.teacherId && cls.teacherId === user.staffId) return true;
+  const me = all.staff.find((s) => s.id === user.staffId);
+  return (me?.teaching || []).some((t) => t.subject.trim().toLowerCase() === subject.toLowerCase() && (t.classIds || []).includes(cls.id));
+}
+
+const termOf = (all, termId) => all.sessions.flatMap((s) => (s.terms || []).map((t) => ({ ...t, sessionId: s.id }))).find((t) => t.id === termId);
+const autoRemark = (avg) => (avg >= 16 ? 'Outstanding performance, keep it up.' : avg >= 12 ? 'Good work. Can do better.' : avg >= 10 ? 'Average. Needs more effort.' : 'Weak. Needs close follow-up at home.');
+
+/** One subject's marks for a class and term, entered by whoever teaches it. Results are then recalculated. */
+async function writeMarks(all, user, v, putRecord, now) {
+  const cls = all.classes.find((c) => c.id === v.classId);
+  const term = termOf(all, v.termId);
+  const subject = classSubjects(cls).find((s) => s.name.toLowerCase() === String(v.subject || '').trim().toLowerCase());
+  if (!cls || !term || !subject) throw new Invalid('Choose the class, term and subject.');
+  if (!canEnterMarks(all, user, cls, subject.name)) throw new Forbidden(`You can only enter marks for the subjects you teach. ${subject.name} in ${cls.name} is not one of them.`);
+  const enrolled = new Set(all.students.filter((s) => s.enrollments?.[term.sessionId] === cls.id).map((s) => s.id));
+  const marks = {};
+  for (const [id, m] of Object.entries(v.marks || {})) {
+    if (!enrolled.has(id) || m === '' || m === null || m === undefined) continue;
+    const n = Number(m);
+    if (!(n >= 0 && n <= 20)) throw new Invalid('Marks must be between 0 and 20.');
+    marks[id] = Math.round(n * 100) / 100;
+  }
+  const sheet = { id: `mk-${term.id}-${cls.id}-${subject.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, classId: cls.id, termId: term.id, sessionId: term.sessionId, subject: subject.name, marks, enteredBy: user.id, updatedAt: now };
+  await putRecord('marks', sheet);
+  all.marks = [...all.marks.filter((m) => m.id !== sheet.id), sheet];
+  await recomputeResults(all, cls, term, putRecord);
+}
+
+/** Days present, conduct and remark: set by the class teacher or the office. Marks and positions are never taken from here. */
+async function writeResultDetails(all, user, v, putRecord) {
+  const cls = all.classes.find((c) => c.id === v.classId);
+  const term = termOf(all, v.termId);
+  if (!cls || !term) throw new Invalid('Choose the class and term.');
+  if (user.role === 'teacher' && cls.teacherId !== user.staffId) throw new Forbidden('Only the class teacher can set conduct, attendance and remarks.');
+  const student = all.students.find((s) => s.id === v.studentId && s.enrollments?.[term.sessionId] === cls.id);
+  if (!student) throw new Invalid('This pupil is not in that class for the term.');
+  const id = `ar-${term.id}-${student.id}`;
+  const old = all.academicRecords.find((r) => r.id === id) || { id, studentId: student.id, sessionId: term.sessionId, termId: term.id, classId: cls.id, marks: {} };
+  const remark = String(v.remark || '').trim().slice(0, 300);
+  const rec = {
+    ...old, classId: cls.id, conduct: String(v.conduct || old.conduct || 'Good').slice(0, 30),
+    attendance: v.attendance === '' || v.attendance == null ? null : Math.max(0, Math.round(Number(v.attendance) || 0)),
+    daysOpen: Number(v.daysOpen) || old.daysOpen || null, remarkCustom: !!remark, remark: remark || old.remark || '', enteredBy: user.id,
+  };
+  all.academicRecords = [...all.academicRecords.filter((r) => r.id !== id), rec];
+  await putRecord('academicRecords', rec);
+  await recomputeResults(all, cls, term, putRecord);
+}
+
+/**
+ * Rebuild every pupil's average and position in a class for a term from the subject mark sheets
+ * (plus any marks saved before mark sheets existed), keeping conduct, attendance and remarks.
+ */
+async function recomputeResults(all, cls, term, putRecord) {
+  const subjects = classSubjects(cls);
+  const sheets = all.marks.filter((m) => m.classId === cls.id && m.termId === term.id);
+  const pupils = all.students.filter((s) => s.enrollments?.[term.sessionId] === cls.id);
+  const rows = pupils.map((p) => {
+    const old = all.academicRecords.find((r) => r.studentId === p.id && r.termId === term.id);
+    const marks = { ...(old?.marks || {}) };
+    // A subject's sheet is the truth for that subject: a mark cleared there is cleared here.
+    for (const sh of sheets) {
+      if (sh.marks?.[p.id] !== undefined) marks[sh.subject] = sh.marks[p.id];
+      else delete marks[sh.subject];
+    }
+    return { p, old, marks, avg: weightedAverage(marks, subjects) };
+  }).filter((r) => r.old || r.avg !== null);
+  const ranked = rows.filter((r) => r.avg !== null).sort((a, b) => b.avg - a.avg);
+  const avgs = ranked.map((r) => r.avg);
+  const classAverage = avgs.length ? Math.round((avgs.reduce((t, a) => t + a, 0) / avgs.length) * 100) / 100 : null;
+  for (const r of rows) {
+    const i = ranked.indexOf(r);
+    // Ties share a position.
+    const position = i < 0 ? null : ranked.findIndex((x) => x.avg === r.avg) + 1;
+    const rec = {
+      conduct: 'Good', attendance: null, daysOpen: null, ...(r.old || {}),
+      id: `ar-${term.id}-${r.p.id}`, studentId: r.p.id, sessionId: term.sessionId, termId: term.id, classId: cls.id,
+      marks: r.marks, subjects, average: r.avg, position, outOf: ranked.length, classAverage, highest: avgs[0] ?? null, lowest: avgs.at(-1) ?? null,
+    };
+    if (!rec.remarkCustom && r.avg !== null) rec.remark = autoRemark(r.avg);
+    if (JSON.stringify(rec) === JSON.stringify(r.old)) continue;
+    all.academicRecords = [...all.academicRecords.filter((x) => x.id !== rec.id), rec];
+    await putRecord('academicRecords', rec);
+  }
+}
+
 async function writeAttendance(all, user, before, after, putRecord, now) {
   const cls = all.classes.find((c) => c.id === after.classId);
   if (!cls || !/^\d{4}-\d{2}-\d{2}$/.test(after.date || '')) throw new Invalid('Choose the class and the date.');
@@ -304,7 +416,7 @@ async function writeAttendance(all, user, before, after, putRecord, now) {
     const userIds = all.users.filter((u) => u.role === 'parent' && u.status === 'active' && (s.guardianIds || []).includes(u.guardianId)).map((u) => u.id);
     if (!userIds.length) continue;
     await putRecord('notifications', {
-      id: newId('nt'), userIds, roles: [], kind: 'info', link: `/portal/children?child=${s.id}&tab=attendance`, readBy: [], createdAt: now, by: user.id,
+      id: newId('nt'), userIds, roles: [], kind: 'info', sms: 'absence', link: `/portal/children?child=${s.id}&tab=attendance`, readBy: [], createdAt: now, by: user.id,
       title: `${s.firstName} was marked absent ${when}`,
       body: `${s.firstName} ${s.lastName} (${cls.name}) was not in class ${when}. If this is a mistake or your child is sick, please contact the school.`,
     });
@@ -326,10 +438,11 @@ async function writeAnnouncement(all, user, before, after, putRecord, now) {
   const note = { kind: 'announcement', readBy: [], createdAt: now, by: user.id, title: a.title, body: String(a.body).slice(0, 180) };
   if (a.audience === 'personal') {
     const userIds = all.users.filter((u) => u.role === 'parent' && u.status === 'active' && guardianIds.includes(u.guardianId)).map((u) => u.id);
-    if (userIds.length) await putRecord('notifications', { ...note, id: newId('nt'), userIds, roles: [], link: '/portal/news', title: `Message from the school: ${a.title}` });
+    if (userIds.length) await putRecord('notifications', { ...note, id: newId('nt'), userIds, roles: [], sms: 'personal', link: '/portal/news', title: `Message from the school: ${a.title}` });
     return;
   }
-  if (a.audience !== 'staff') await putRecord('notifications', { ...note, id: newId('nt'), userIds: [], roles: ['parent'], link: '/portal/news' });
+  // "Also send by SMS" on a general announcement texts parents too (it costs money, so it is a choice each time).
+  if (a.audience !== 'staff') await putRecord('notifications', { ...note, id: newId('nt'), userIds: [], roles: ['parent'], link: '/portal/news', ...(after.sms ? { sms: 'announcement' } : {}) });
   if (a.audience !== 'parents') await putRecord('notifications', { ...note, id: newId('nt'), userIds: [], roles: STAFF_ROLES, link: '/announcements' });
 }
 

@@ -14,7 +14,21 @@ export default function MyClass() {
   const [tab, setTab] = useState('list');
   const cls = db.classes.find((c) => c.teacherId === user.staffId);
   const term = currentTerm(db);
-  if (!cls) return <><PageHeader title="My Class" /><Empty title="No class assigned yet" message="Ask the administrator to assign you to a class under School Profile → Classes." /></>;
+  if (!cls) {
+    const teaches = (db.staff.find((s) => s.id === user.staffId)?.teaching || []).filter((t) => t.subject && t.classIds?.length);
+    return (
+      <>
+        <PageHeader title="My Class" />
+        {teaches.length ? (
+          <Card title="Your subjects">
+            <p className="text-sm text-slate-600">You are not a class teacher, but you teach:</p>
+            <ul className="mt-2 space-y-1 text-sm">{teaches.map((t) => <li key={t.subject}><b>{t.subject}</b> · {t.classIds.map((id) => db.classes.find((c) => c.id === id)?.name).filter(Boolean).join(', ')}</li>)}</ul>
+            <Link to="/academics"><Button className="mt-4">Enter marks</Button></Link>
+          </Card>
+        ) : <Empty title="No class assigned yet" message="Ask the administrator to assign you to a class under School Profile → Classes, or to list your subjects on your staff record." />}
+      </>
+    );
+  }
   const pupils = db.students.filter((s) => s.status === 'active' && s.classId === cls.id).sort((a, b) => a.lastName.localeCompare(b.lastName));
   const boys = pupils.filter((s) => s.gender === 'M').length;
   return (
@@ -25,7 +39,7 @@ export default function MyClass() {
         <StatCard label="Boys" value={boys} tone="blue" />
         <StatCard label="Girls" value={pupils.length - boys} tone="purple" />
       </div>
-      <Tabs tabs={[{ id: 'list', label: 'Class list', count: pupils.length }, { id: 'results', label: 'Term results' }, { id: 'promotion', label: 'Promotion recommendations' }, { id: 'news', label: 'Announcements' }]} value={tab} onChange={setTab} />
+      <Tabs tabs={[{ id: 'list', label: 'Class list', count: pupils.length }, { id: 'results', label: 'Marks & report cards' }, { id: 'promotion', label: 'Promotion recommendations' }, { id: 'news', label: 'Announcements' }]} value={tab} onChange={setTab} />
       {tab === 'list' && <ClassList cls={cls} pupils={pupils} />}
       {tab === 'results' && <Academics lockedClassId={cls.id} />}
       {tab === 'promotion' && <Recommendations cls={cls} pupils={pupils} />}

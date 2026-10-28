@@ -368,3 +368,21 @@ export function reportCardsPDF({ school, cards, filename }) {
   footer(doc);
   doc.save(`${clean(filename || 'Report cards')}.pdf`.replace(/[\/:*?"<>|]/g, '-'));
 }
+
+/** A weekly timetable grid (A4 landscape). rows: [{ time, kind, label, cells: [text per day] }] */
+export function timetablePDF({ school, title, subtitle, days, rows, filename }) {
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const y = letterhead(doc, school, title, subtitle);
+  autoTable(doc, {
+    startY: y,
+    head: [['Time', ...days]],
+    body: rows.map((r) => (r.kind === 'break' ? [r.time, { content: clean(r.label || 'Break'), colSpan: days.length, styles: { halign: 'center', fillColor: [242, 238, 229], fontStyle: 'italic' } }] : [r.time, ...r.cells.map(clean)])),
+    styles: { fontSize: 8.5, cellPadding: 2, valign: 'middle', lineColor: [220, 214, 200], lineWidth: 0.1 },
+    headStyles: { fillColor: BRAND },
+    columnStyles: { 0: { cellWidth: 26, fontStyle: 'bold' } },
+    theme: 'grid',
+    margin: { left: 14, right: 14, bottom: 16 },
+  });
+  footer(doc);
+  doc.save(`${clean(filename || title)}.pdf`.replace(/[\/:*?"<>|]/g, '-'));
+}

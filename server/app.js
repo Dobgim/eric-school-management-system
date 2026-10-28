@@ -6,10 +6,12 @@ import { fileURLToPath } from 'node:url';
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import { clearFailures, clearSessionCookie, hashPassword, loginBlocked, recordFailure, requireUser, setSessionCookie, toClientUser, verifyPassword } from './auth.js';
-import { COUNTER_ACCESS, Forbidden, applyOps, loadAll, newId, nextCounter, viewFor } from './data.js';
+import { COLLECTIONS, COUNTER_ACCESS, Forbidden, applyOps, loadAll, newId, nextCounter, viewFor } from './data.js';
 import { db } from './db.js';
 import { momoMode, normalizePhone } from './momo.js';
 import { paymentRoutes } from './payments.js';
+import { flushSms, sendSms, smsConfig } from './sms.js';
+import { setSecret } from './secrets.js';
 import { flushPush, pushStats, removeSubscription, saveSubscription, sendTest, vapidKeys } from './push.js';
 import { ensureSetup } from './setup.js';
 import { signupRoutes } from './signup.js';
@@ -23,7 +25,10 @@ export const SERVERLESS = !!process.env.VERCEL;
 const app = express();
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
-app.use(express.json({ limit: '12mb' })); // uploaded documents and photos travel as data URLs
+// Uploaded documents and photos travel as data URLs; a restored backup can be larger still.
+const jsonSmall = express.json({ limit: '12mb' });
+const jsonLarge = express.json({ limit: '80mb' });
+app.use((req, res, next) => (req.path === '/api/backup/restore' ? jsonLarge : jsonSmall)(req, res, next));
 app.use(cookieParser());
 
 // Connect to the database and create the clean starting data once per process (cold start on Vercel).
@@ -38,10 +43,16 @@ app.use('/api', (req, res, next) => {
   const json = res.json.bind(res);
   res.json = (body) => {
     // The answer says how many phones were reached, so the office can see that a message went out.
-    db().then((conn) => flushPush(conn.query, `${req.protocol}://${req.get('host')}`))
-      .then((push) => { if (push && body && typeof body === 'object' && !Array.isArray(body)) body.push = push; })
-      .catch((e) => console.error('push:', e.message))
-      .finally(() => json(body));
+    // Texts go out in the same pass for parents who get SMS.
+    const isObj = body && typeof body === 'object' && !Array.isArray(body);
+    db().then(async (conn) => {
+      const [push, sms] = await Promise.all([
+        flushPush(conn.query, `${req.protocol}://${req.get('host')}`).catch((e) => console.error('push:', e.message)),
+        flushSms(conn.query).catch((e) => console.error('sms:', e.message)),
+      ]);
+      if (isObj && push) body.push = push;
+      if (isObj && sms) body.sms = sms;
+    }).finally(() => json(body));
     return res;
   };
   next();
@@ -172,6 +183,39 @@ app.get('/api/backup', requireUser, wrap(async (req, res) => {
   await logEntry(conn.query, req.user.id, 'Downloaded full backup');
 }));
 
+// Put back a backup file (super admin). School data is replaced; sign-in accounts are left as they are.
+app.post('/api/backup/restore', requireUser, wrap(async (req, res) => {
+  if (req.user.role !== 'superadmin') throw new Forbidden('Only the super admin can restore a backup.');
+  const { backup, confirm } = req.body || {};
+  if (confirm !== 'RESTORE') return res.status(400).json({ error: 'Type RESTORE to confirm.' });
+  const data = backup?.data;
+  if (backup?.app !== 'School Information System' || !data || !Array.isArray(data.students) || !data.school) return res.status(400).json({ error: 'This is not a backup file from this app.' });
+  const conn = await db();
+  const counts = {};
+  await conn.tx(async (q) => {
+    await q('delete from records');
+    for (const c of COLLECTIONS) {
+      const list = Array.isArray(data[c]) ? data[c].filter((r) => r && typeof r.id === 'string') : [];
+      counts[c] = list.length;
+      for (const r of list) {
+        // Restored messages were already delivered once: never push or text them again.
+        const v = c === 'notifications' ? { ...r, pushed: true, smsSent: true } : r;
+        await q('insert into records (collection, id, data, updated_by) values ($1, $2, $3::jsonb, $4)', [c, r.id, JSON.stringify(v), req.user.id]);
+      }
+    }
+    const { counters = {}, ...settings } = data.settings || {};
+    for (const [k, v] of [['school', data.school], ['settings', settings]]) {
+      await q(`insert into kv (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value, updated_at = now()`, [k, JSON.stringify(v)]);
+    }
+    for (const [name, value] of Object.entries(counters)) {
+      if (Number.isInteger(value)) await q('insert into counters (name, value) values ($1, $2) on conflict (name) do update set value = greatest(counters.value, excluded.value)', [name, value]);
+    }
+  });
+  await logEntry(conn.query, req.user.id, 'Restored a backup', `From ${backup.exportedAt || 'unknown date'}: ${counts.students} pupils, ${counts.payments} payments`);
+  broadcast({ type: 'change', by: null, collections: [...COLLECTIONS, 'school', 'settings'] });
+  res.json({ ok: true, counts });
+}));
+
 app.post('/api/counters/:name', requireUser, wrap(async (req, res) => {
   if (!(COUNTER_ACCESS[req.user.role] || []).includes(req.params.name)) throw new Forbidden('Not allowed.');
   const conn = await db();
@@ -200,6 +244,55 @@ app.post('/api/push/subscribe', requireUser, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 // Allowed without a session: called while signing out, so the next person on this phone doesn't get these alerts.
+// ---- SMS provider (super admin). Keys are stored encrypted; settings.sms holds the non-secret choices.
+const SMS_KINDS = ['absence', 'personal', 'payment', 'announcement'];
+app.get('/api/sms/config', requireUser, wrap(async (req, res) => {
+  if (req.user.role !== 'superadmin') throw new Forbidden('Only the super admin manages SMS.');
+  const conn = await db();
+  const cfg = await smsConfig(conn.query);
+  res.json({ provider: cfg?.provider || '', sender: cfg?.sender || '', username: cfg?.username || '', accountSid: cfg?.accountSid ? `${cfg.accountSid.slice(0, 6)}…` : '', url: cfg?.url ? cfg.url.replace(/(pass(word)?|key|token|secret)=[^&]*/gi, '$1=•••') : '', configured: !!cfg?.provider });
+}));
+app.post('/api/sms/config', requireUser, wrap(async (req, res) => {
+  if (req.user.role !== 'superadmin') throw new Forbidden('Only the super admin manages SMS.');
+  const b = req.body || {};
+  const conn = await db();
+  if (b.remove) {
+    await setSecret(conn.query, 'sms', null);
+  } else if (b.provider) {
+    const cfg = { provider: b.provider, sender: String(b.sender || '').trim().slice(0, 11) };
+    if (b.provider === 'twilio') Object.assign(cfg, { accountSid: String(b.accountSid || '').trim(), authToken: String(b.authToken || '').trim() });
+    else if (b.provider === 'africastalking') Object.assign(cfg, { username: String(b.username || '').trim(), apiKey: String(b.apiKey || '').trim() });
+    else if (b.provider === 'custom') Object.assign(cfg, { url: String(b.url || '').trim() });
+    else return res.status(400).json({ error: 'Choose an SMS provider.' });
+    const missing = b.provider === 'twilio' ? !cfg.accountSid || !cfg.authToken || !cfg.sender
+      : b.provider === 'africastalking' ? !cfg.username || !cfg.apiKey
+        : !/^https?:\/\//.test(cfg.url) || !cfg.url.includes('{message}') || !cfg.url.includes('{to');
+    if (missing) return res.status(400).json({ error: b.provider === 'custom' ? 'Enter the provider’s web link, with {to} and {message} where the number and text go.' : 'Fill in all the provider details.' });
+    await setSecret(conn.query, 'sms', cfg);
+  }
+  // Which messages go by SMS (not secret).
+  const { rows } = await conn.query("select value from kv where key = 'settings'");
+  const settings = rows[0]?.value || {};
+  const cfg = await smsConfig(conn.query);
+  settings.sms = {
+    enabled: !!cfg?.provider && b.enabled !== false,
+    onlyWithoutApp: b.onlyWithoutApp !== false,
+    for: Object.fromEntries(SMS_KINDS.map((k) => [k, !!(b.for?.[k] ?? settings.sms?.for?.[k] ?? k !== 'announcement')])),
+  };
+  await conn.query(`insert into kv (key, value) values ('settings', $1::jsonb) on conflict (key) do update set value = excluded.value, updated_at = now()`, [JSON.stringify(settings)]);
+  broadcast({ type: 'change', by: null, collections: ['settings'] });
+  res.json({ ok: true, sms: settings.sms });
+}));
+app.post('/api/sms/test', requireUser, wrap(async (req, res) => {
+  if (req.user.role !== 'superadmin') throw new Forbidden('Only the super admin manages SMS.');
+  const conn = await db();
+  const cfg = await smsConfig(conn.query);
+  if (!cfg?.provider) return res.status(400).json({ error: 'Save the SMS provider first.' });
+  const r = await sendSms(cfg, [req.body?.phone], 'Test message from your school app. SMS is working.');
+  if (!r.sent) return res.status(400).json({ error: `The SMS was not sent: ${r.errors[0] || 'check the number'}` });
+  res.json(r);
+}));
+
 app.post('/api/push/test', requireUser, wrap(async (req, res) => {
   const conn = await db();
   res.json(await sendTest(conn.query, req.user, `${req.protocol}://${req.get('host')}`));
