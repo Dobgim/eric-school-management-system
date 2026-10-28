@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Banknote, Download, Plus, Trash2 } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { can } from '../lib/permissions';
-import { allTerms, billLines, currentTerm, feeStatus, termPaid, termsUpTo } from '../lib/finance';
+import { allTerms, billLines, currentTerm, feeStatus, termPaid, termsUpTo, yearStatus } from '../lib/finance';
 import { downloadReceipt } from '../lib/documents';
 import { exportExcel, exportTablePDF } from '../lib/exporters';
 import { PAYMENT_METHODS, feeTypeLabel, fmtDate, fullName, methodLabel, money, pad, sum, today, uid } from '../lib/utils';
@@ -223,10 +223,19 @@ export function PaymentModal({ open, onClose, onSaved, initialStudent }) {
                     <li className="flex justify-between font-bold text-rose-600"><span>Balance</span><span className="tabular-nums">{money(Math.max(0, (sel?.billed || 0) - (sel?.paid || 0)), '')}</span></li>
                   </ul>
                 </div>
+                {(() => { const y = yearStatus(db, student); return (
+                  <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm">
+                    <p className="label mb-2">Whole school year</p>
+                    <div className="flex justify-between"><span className="text-slate-600">School fees for the year</span><b className="tabular-nums">{money(y.billed, cur)}</b></div>
+                    <div className="mt-1 flex justify-between"><span className="text-slate-600">Paid so far this year</span><b className="text-emerald-700 tabular-nums">{money(y.paid, cur)}</b></div>
+                    {y.arrears > 0 && <div className="mt-1 flex justify-between"><span className="text-slate-600">Owed from earlier years</span><b className="text-rose-600 tabular-nums">{money(y.arrears, cur)}</b></div>}
+                    <div className="mt-2 flex justify-between border-t border-brand-200 pt-2"><span className="font-semibold">Left to pay for the year</span><b className="text-rose-600 tabular-nums">{money(y.totalLeft, cur)}</b></div>
+                  </div>
+                ); })()}
                 <div className="rounded-xl bg-slate-50 p-4 text-sm">
                   <div className="flex justify-between"><span className="text-slate-600">Current term balance</span><b className="tabular-nums">{money(status.balance, cur)}</b></div>
                   <div className="mt-1 flex justify-between"><span className="text-slate-600">Arrears (earlier terms)</span><b className="text-rose-600 tabular-nums">{money(status.arrears, cur)}</b></div>
-                  <div className="mt-2 flex justify-between border-t border-slate-200 pt-2"><span className="font-semibold">Total owing</span><b className="tabular-nums">{money(status.totalDue, cur)}</b></div>
+                  <div className="mt-2 flex justify-between border-t border-slate-200 pt-2"><span className="font-semibold">Due now (this term and before)</span><b className="tabular-nums">{money(status.totalDue, cur)}</b></div>
                 </div>
               </div>
             ) : (

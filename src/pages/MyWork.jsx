@@ -1,9 +1,11 @@
 import { Download } from 'lucide-react';
+import { grossPay, staffPay } from '../lib/finance';
 import { useStore } from '../lib/store';
 import { downloadPayslip } from '../lib/documents';
 import { ROLES, fmtDate, money, monthLabel } from '../lib/utils';
 import { Avatar, Badge, Card, DataTable, Empty, Info, PageHeader, Button } from '../components/ui';
 import { AnnouncementList, visibleAnnouncements } from './Announcements';
+import { MyAttendance } from '../components/StaffAttendance';
 
 /** Every staff member's own page: profile and payslips. */
 export default function MyWork() {
@@ -18,6 +20,7 @@ export default function MyWork() {
   return (
     <>
       <PageHeader title={user.role === 'staff' ? `Welcome, ${user.name.split(' ')[0]}` : 'My Payslips'} subtitle={db.school.name} />
+      <div className="mb-6"><MyAttendance /></div>
       <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
         <Card title="My profile" className="h-fit">
           <div className="mb-4 flex items-center gap-3">
@@ -31,7 +34,7 @@ export default function MyWork() {
               <Info label="Phone">{me.phone}</Info>
               <Info label="Employed">{fmtDate(me.dateEmployed)}</Info>
               <Info label="Paid via">{me.bankName || 'Cash'}</Info>
-              <Info label="Salary scale">{db.salaryScales.find((g) => g.id === me.gradeId)?.name}</Info>
+              <Info label="Salary">{(() => { const p = staffPay(db, me); return p.none ? '—' : `${money(grossPay(p), '')} / month`; })()}</Info>
             </dl>
           ) : <p className="text-sm text-slate-500">Your account is not linked to a staff record yet. Ask the administrator.</p>}
         </Card>

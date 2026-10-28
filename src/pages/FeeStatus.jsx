@@ -15,7 +15,7 @@ import { Progress } from '../components/Charts';
 export default function FeeStatus({ completed }) {
   const { db } = useStore();
   const cur = db.school.currency;
-  const [scope, setScope] = useState(db.settings.currentTermId);
+  const [scope, setScope] = useState('year');
   const [classId, setClassId] = useState('');
   const [q, setQ] = useState('');
 

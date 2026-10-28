@@ -101,7 +101,7 @@ export default function Guardians() {
       <Modal open={!!account} onClose={() => setAccount(null)} title={account?.g.user ? 'Reset portal login' : 'Create portal login'} size="sm" footer={<><Button variant="secondary" onClick={() => setAccount(null)}>Cancel</Button><Button onClick={saveAccount}>Save login</Button></>}>
         {account && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">{account.g.name} will be able to see their children’s profiles, fees, receipts, purchases and school announcements.</p>
+            <p className="text-sm text-slate-600">{account.g.name} will be able to see their children’s profiles, fees, receipts, results and school announcements.</p>
             <Field label="Username"><Input value={account.username} onChange={(e) => setAccount({ ...account, username: e.target.value })} /></Field>
             <Field label="Password" hint="Share it with the parent privately; they can change it under My Account."><Input value={account.password} onChange={(e) => setAccount({ ...account, password: e.target.value })} /></Field>
           </div>

@@ -4,7 +4,8 @@ import { useStore } from '../lib/store';
 import { currentTerm } from '../lib/finance';
 import { exportExcel, exportTablePDF } from '../lib/exporters';
 import { fmtDate, fmtDateTime, fullName, today } from '../lib/utils';
-import { Badge, Button, Card, Empty, ExportButtons, Field, PageHeader, Select, StatCard, useToast } from '../components/ui';
+import { Badge, Button, Card, DataTable, Empty, ExportButtons, Field, PageHeader, Select, StatCard, Tabs, useToast } from '../components/ui';
+import StaffAttendance, { MyAttendance } from '../components/StaffAttendance';
 
 const STATES = [['present', 'Present', 'bg-emerald-600 text-white border-emerald-600'], ['absent', 'Absent', 'bg-rose-600 text-white border-rose-600'], ['late', 'Late', 'bg-amber-500 text-white border-amber-500']];
 
@@ -12,7 +13,22 @@ const STATES = [['present', 'Present', 'bg-emerald-600 text-white border-emerald
  * Daily register: the class teacher (own class) or the office marks who is absent or late.
  * Parents of absent pupils are notified straight away, in the app and on their phone.
  */
+/** Pupils' daily register for teachers; the office also keeps the staff register here. */
 export default function Attendance() {
+  const { user } = useStore();
+  const office = user.role === 'superadmin' || user.role === 'admin';
+  const [tab, setTab] = useState('pupils');
+  if (!office) return <PupilAttendance />;
+  return (
+    <>
+      <PageHeader title="Daily attendance" subtitle="Pupils’ registers by class, and the register of teachers and staff." />
+      <Tabs tabs={[{ id: 'pupils', label: 'Pupils' }, { id: 'staff', label: 'Teachers & staff' }]} value={tab} onChange={setTab} />
+      {tab === 'pupils' ? <PupilAttendance embedded /> : <StaffAttendance />}
+    </>
+  );
+}
+
+function PupilAttendance({ embedded }) {
   const { db, api, user } = useStore();
   const [toast, notify] = useToast();
   const myClass = user.role === 'teacher' ? db.classes.find((c) => c.teacherId === user.staffId)?.id : null;
@@ -64,7 +80,7 @@ export default function Attendance() {
   return (
     <>
       {toast}
-      <PageHeader title="Daily attendance" subtitle="Mark who is absent or late each morning. Parents of absent pupils get a notification on their phone straight away." />
+      {!embedded && <PageHeader title="Daily attendance" subtitle="Mark who is absent or late each morning. Parents of absent pupils get a notification on their phone straight away." />}
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <Card
           bodyClass=""
@@ -127,6 +143,55 @@ export default function Attendance() {
           </Card>
         </div>
       </div>
+      <AbsenceReport lockedClassId={myClass} />
     </>
+  );
+}
+
+/**
+ * Every absence and late arrival in a period, with the parent's phone and whether the parent has the app
+ * (and so got the alert). Teachers see their own class; the office sees every class.
+ */
+function AbsenceReport({ lockedClassId }) {
+  const { db } = useStore();
+  const term = currentTerm(db);
+  const classes = [...db.classes].sort((a, b) => a.order - b.order);
+  const [from, setFrom] = useState(term?.start || today());
+  const [to, setTo] = useState(today());
+  const [classId, setClassId] = useState(lockedClassId || '');
+  const regs = (db.attendance || []).filter((a) => a.date >= from && a.date <= to && (!classId || a.classId === classId));
+  const rows = regs.flatMap((a) => [...(a.absent || []).map((id) => ['Absent', id]), ...(a.late || []).map((id) => ['Late', id])].map(([kind, id]) => {
+    const s = db.students.find((x) => x.id === id);
+    const g = s && db.guardians.find((x) => x.id === s.guardianIds?.[0]);
+    const hasApp = s && db.users.some((u) => u.role === 'parent' && s.guardianIds?.includes(u.guardianId));
+    return { id: `${a.id}-${id}-${kind}`, date: a.date, kind, name: s ? fullName(s) : '—', regNo: s?.regNo || '', className: db.classes.find((c) => c.id === a.classId)?.name || '', parent: g?.name || '—', phone: g?.phone || '', told: kind === 'Absent' ? (hasApp ? 'Yes (app)' : 'No app account') : '—' };
+  })).sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
+  const cols = [
+    { key: 'date', label: 'Date', format: (v) => fmtDate(v) }, { key: 'kind', label: 'Status' }, { key: 'name', label: 'Pupil' }, { key: 'className', label: 'Class' },
+    { key: 'parent', label: 'Parent' }, { key: 'phone', label: 'Phone' }, { key: 'told', label: 'Parent alerted' },
+  ];
+  const period = `${fmtDate(from)} – ${fmtDate(to)}`;
+  return (
+    <Card className="mt-6" bodyClass="" title="Absence report"
+      actions={<ExportButtons
+        onPdf={() => exportTablePDF({ school: db.school, title: 'Absence Report', subtitle: `${classId ? db.classes.find((c) => c.id === classId)?.name : 'All classes'} · ${period}`, columns: cols, rows, summary: [['Absences', String(rows.filter((r) => r.kind === 'Absent').length)], ['Late arrivals', String(rows.filter((r) => r.kind === 'Late').length)], ['Registers taken', String(regs.length)]] })}
+        onExcel={() => exportExcel({ title: 'Absence Report', columns: cols, rows })}
+      />}>
+      <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-3">
+        <Field label="From"><input className="input" type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></Field>
+        <Field label="To"><input className="input" type="date" value={to} max={today()} onChange={(e) => setTo(e.target.value)} /></Field>
+        <Field label="Class"><Select value={classId} onChange={(e) => setClassId(e.target.value)} disabled={!!lockedClassId} placeholder="All classes" options={classes.map((c) => ({ value: c.id, label: c.name }))} /></Field>
+      </div>
+      <p className="px-4 py-3 text-sm text-slate-600"><b className="text-rose-600">{rows.filter((r) => r.kind === 'Absent').length}</b> absences · <b className="text-amber-700">{rows.filter((r) => r.kind === 'Late').length}</b> late · from <b>{regs.length}</b> registers taken</p>
+      <DataTable rows={rows} pageSize={20}
+        empty={<Empty title="No absences in this period" message={regs.length ? 'Every pupil was present.' : 'No register was taken in this period. Choose the class and date above, mark who is absent, and save.'} />}
+        columns={[
+          { key: 'date', label: 'Date', render: (r) => fmtDate(r.date) },
+          { key: 'name', label: 'Pupil', render: (r) => <div><p className="font-semibold text-slate-800">{r.name}</p><p className="text-xs text-slate-500">{r.className}</p></div> },
+          { key: 'kind', label: 'Status', render: (r) => <Badge tone={r.kind === 'Absent' ? 'red' : 'amber'}>{r.kind}</Badge> },
+          { key: 'parent', label: 'Parent', render: (r) => <div><p>{r.parent}</p><p className="text-xs text-slate-500">{r.phone}</p></div> },
+          { key: 'told', label: 'Parent alerted', render: (r) => (r.kind === 'Absent' ? <Badge tone={r.told.startsWith('Yes') ? 'green' : 'slate'}>{r.told}</Badge> : '—') },
+        ]} />
+    </Card>
   );
 }

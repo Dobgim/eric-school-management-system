@@ -5,9 +5,10 @@ import { can } from '../lib/permissions';
 import { exportExcel, exportTablePDF } from '../lib/exporters';
 import { fmtDate, money, pad, today, uid } from '../lib/utils';
 import { SUBJECTS } from '../lib/subjects';
+import { grossPay, staffPay } from '../lib/finance';
 import { Avatar, Badge, Button, Card, DataTable, ExportButtons, Field, Input, Modal, PageHeader, SearchInput, Select, StatCard, Tabs, useToast } from '../components/ui';
 
-const blank = { firstName: '', lastName: '', gender: 'F', category: 'teaching', position: '', qualification: '', phone: '', email: '', dateEmployed: '', dob: '', address: '', gradeId: '', bankName: '', accountNo: '', momoNumber: '', classId: null, status: 'active', teaching: [] };
+const blank = { firstName: '', lastName: '', gender: 'F', category: 'teaching', position: '', qualification: '', phone: '', email: '', dateEmployed: '', dob: '', address: '', gradeId: '', bankName: '', accountNo: '', momoNumber: '', classId: null, status: 'active', teaching: [], salary: { basic: '', housing: '', transport: '' } };
 
 export default function Staff() {
   const { db, user } = useStore();
@@ -41,7 +42,7 @@ function StaffList() {
     .sort((a, b) => a.staffNo.localeCompare(b.staffNo)), [db.staff, q, cat, status]);
 
   const active = db.staff.filter((s) => s.status === 'active');
-  const monthly = active.reduce((t, s) => { const g = grade(s.gradeId); return t + (g ? g.basic + g.housing + g.transport : 0); }, 0);
+  const monthly = active.reduce((t, s) => t + grossPay(staffPay(db, s)), 0);
 
   const save = async () => {
     const s = { ...editing, teaching: (editing.teaching || []).map((t) => ({ subject: t.subject.trim(), classIds: t.classIds || [] })).filter((t) => t.subject) };
@@ -63,7 +64,7 @@ function StaffList() {
     { key: 'cat', label: 'Category' }, { key: 'phone', label: 'Phone' }, { key: 'employed', label: 'Employed' },
     ...(showPay ? [{ key: 'grade', label: 'Scale' }, { key: 'gross', label: 'Monthly gross', align: 'right', format: (v) => money(v, '') }] : []),
   ];
-  const exportRows = () => rows.map((s) => { const g = grade(s.gradeId); return { ...s, name: `${s.firstName} ${s.lastName}`, cat: s.category === 'teaching' ? 'Teaching' : 'Non-teaching', employed: fmtDate(s.dateEmployed), grade: g?.name, gross: g ? g.basic + g.housing + g.transport : 0 }; });
+  const exportRows = () => rows.map((s) => { const p = staffPay(db, s); return { ...s, name: `${s.firstName} ${s.lastName}`, cat: s.category === 'teaching' ? 'Teaching' : 'Non-teaching', employed: fmtDate(s.dateEmployed), grade: p.none ? '' : p.name, gross: grossPay(p) }; });
 
   return (
     <>
@@ -94,8 +95,8 @@ function StaffList() {
             { key: 'phone', label: 'Phone' },
             { key: 'employed', label: 'Employed', render: (s) => fmtDate(s.dateEmployed) },
             ...(showPay ? [
-              { key: 'grade', label: 'Salary scale', render: (s) => grade(s.gradeId)?.name || '—' },
-              { key: 'gross', label: 'Gross / month', align: 'right', render: (s) => { const g = grade(s.gradeId); return g ? money(g.basic + g.housing + g.transport, '') : '—'; } },
+              { key: 'grade', label: 'Salary', render: (s) => { const p = staffPay(db, s); return p.none ? <span className="text-amber-700">Not set</span> : p.own ? 'Own salary' : p.name; } },
+              { key: 'gross', label: 'Gross / month', align: 'right', render: (s) => { const p = staffPay(db, s); return p.none ? '—' : money(grossPay(p), ''); } },
             ] : []),
             ...(edit ? [{ key: 'a', label: '', align: 'right', render: (s) => <Button size="sm" variant="ghost" icon={Pencil} onClick={() => setEditing({ ...s })} aria-label="Edit" /> }] : []),
           ]}
@@ -120,7 +121,7 @@ function StaffList() {
             </div>
             {editing.category === 'teaching' && <Teaching value={editing.teaching || []} onChange={(teaching) => setEditing({ ...editing, teaching })} />}
             <div className="grid gap-4 rounded-xl bg-slate-50 p-4 sm:grid-cols-3">
-              <Field label="Salary scale"><Select value={editing.gradeId} onChange={(e) => setEditing({ ...editing, gradeId: e.target.value })} options={db.salaryScales.map((g) => ({ value: g.id, label: `${g.name} (${money(g.basic + g.housing + g.transport, '')})` }))} /></Field>
+              {showPay && <SalaryFields editing={editing} setEditing={setEditing} />}
               <Field label="Paid via"><Select value={editing.bankName} onChange={(e) => setEditing({ ...editing, bankName: e.target.value })} placeholder="Cash" options={['Afriland First Bank', 'CCA Bank', 'UBA Cameroon', 'Ecobank', 'SGC', 'MTN Mobile Money', 'Orange Money']} /></Field>
               <Field label={/Money/.test(editing.bankName) ? 'MoMo number' : 'Account number'}>
                 {/Money/.test(editing.bankName)
@@ -174,6 +175,39 @@ function Teaching({ value, onChange }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Monthly salary: typed in directly for this person (basic + allowances), or taken from a salary scale.
+ * Only the super admin and the bursar see and set salaries.
+ */
+function SalaryFields({ editing, setEditing }) {
+  const { db } = useStore();
+  const own = editing.salary || {};
+  const [mode, setMode] = useState(Number(own.basic) > 0 || !db.salaryScales.length ? 'own' : 'scale');
+  const setOwn = (k) => (e) => setEditing({ ...editing, salary: { ...own, [k]: e.target.value } });
+  const total = (Number(own.basic) || 0) + (Number(own.housing) || 0) + (Number(own.transport) || 0);
+  return (
+    <div className="space-y-3 sm:col-span-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="label mb-0">Salary</span>
+        {[['own', 'Type the salary'], ['scale', 'Use a salary scale']].map(([id, label]) => (
+          <button key={id} type="button" aria-pressed={mode === id} onClick={() => { setMode(id); if (id === 'scale') setEditing({ ...editing, salary: { basic: '', housing: '', transport: '' } }); else setEditing({ ...editing, gradeId: '' }); }}
+            className={`rounded-md border px-3 py-1 text-xs font-semibold ${mode === id ? 'border-brand-700 bg-brand-700 text-white' : 'border-slate-300 bg-white text-slate-600'}`}>{label}</button>
+        ))}
+      </div>
+      {mode === 'own' ? (
+        <div className="grid gap-3 sm:grid-cols-4">
+          <Field label="Basic salary (per month)"><Input type="number" min="0" step="1000" value={own.basic ?? ''} onChange={setOwn('basic')} placeholder="e.g. 85000" /></Field>
+          <Field label="Housing allowance"><Input type="number" min="0" step="1000" value={own.housing ?? ''} onChange={setOwn('housing')} placeholder="0" /></Field>
+          <Field label="Transport allowance"><Input type="number" min="0" step="1000" value={own.transport ?? ''} onChange={setOwn('transport')} placeholder="0" /></Field>
+          <div className="self-end pb-2 text-sm">Gross: <b className="tabular-nums">{money(total, db.school.currency)}</b></div>
+        </div>
+      ) : db.salaryScales.length ? (
+        <Field label="Salary scale"><Select value={editing.gradeId} onChange={(e) => setEditing({ ...editing, gradeId: e.target.value })} placeholder="— Choose a scale —" options={db.salaryScales.map((g) => ({ value: g.id, label: `${g.name} (${money(g.basic + g.housing + g.transport, '')})` }))} /></Field>
+      ) : <p className="text-sm text-slate-600">No salary scales yet. Create them under the <b>Salary scales</b> tab, or choose “Type the salary”.</p>}
     </div>
   );
 }

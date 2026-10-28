@@ -1,7 +1,7 @@
 import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarCheck, Clock, Download, GraduationCap, ShoppingBag, Smartphone, Wallet } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { allTerms, billLines, currentSession, currentTerm, feeStatus, sessionTerms, termBill, termPaid, termsUpTo } from '../lib/finance';
+import { allTerms, billLines, currentSession, currentTerm, feeStatus, sessionTerms, termBill, termPaid, termsUpTo, yearStatus } from '../lib/finance';
 import { downloadReceipt, downloadReportCards } from '../lib/documents';
 import { age, feeTypeLabel, fmtDate, fullName, methodLabel, money, today } from '../lib/utils';
 import { Avatar, Badge, Button, Card, DataTable, Empty, FeeBadge, Info, PageHeader, Tabs } from '../components/ui';
@@ -21,7 +21,7 @@ export default function Portal() {
   const setParam = (k, v) => { const p = new URLSearchParams(params); p.set(k, v); setParams(p, { replace: true }); };
   const setTab = (t) => setParam('tab', t);
   const child = kids.find((k) => k.id === childId);
-  const owing = child && child.status === 'active' ? feeStatus(db, child).totalDue : 0;
+  const owing = child && child.status === 'active' ? yearStatus(db, child).totalLeft : 0;
 
   return (
     <>
@@ -42,10 +42,9 @@ export default function Portal() {
       )}
       {!child ? <Empty title="No children linked to your account" message="Contact the school office." /> : (
         <>
-          <Tabs tabs={[{ id: 'overview', label: 'Profile' }, { id: 'fees', label: 'Fees & receipts', icon: Wallet }, { id: 'purchases', label: 'Uniforms & materials', icon: ShoppingBag }, { id: 'results', label: 'Results', icon: GraduationCap }, { id: 'attendance', label: 'Attendance', icon: CalendarCheck }, { id: 'timetable', label: 'Timetable', icon: Clock }]} value={tab} onChange={setTab} />
+          <Tabs tabs={[{ id: 'overview', label: 'Profile' }, { id: 'fees', label: 'Fees & receipts', icon: Wallet }, { id: 'results', label: 'Results', icon: GraduationCap }, { id: 'attendance', label: 'Attendance', icon: CalendarCheck }, { id: 'timetable', label: 'Timetable', icon: Clock }]} value={tab} onChange={setTab} />
           {tab === 'overview' && <Overview child={child} />}
           {tab === 'fees' && <Fees child={child} />}
-          {tab === 'purchases' && <Purchases child={child} />}
           {tab === 'results' && <Results child={child} />}
           {tab === 'attendance' && <Attendance child={child} />}
           {tab === 'timetable' && <ClassTimetable classId={child.classId} />}
@@ -89,7 +88,8 @@ function Overview({ child }) {
           <div className="flex justify-between"><dt className="text-slate-500">Status</dt><dd><FeeBadge state={st.state} /></dd></div>
           <div className="flex justify-between"><dt className="text-slate-500">Term balance</dt><dd className="font-semibold tabular-nums">{money(st.balance, db.school.currency)}</dd></div>
           <div className="flex justify-between"><dt className="text-slate-500">Arrears</dt><dd className="font-semibold text-rose-600 tabular-nums">{money(st.arrears, db.school.currency)}</dd></div>
-          <div className="flex justify-between border-t border-slate-100 pt-2"><dt className="font-semibold">Total owing</dt><dd className="font-bold tabular-nums">{money(st.totalDue, db.school.currency)}</dd></div>
+          <div className="flex justify-between border-t border-slate-100 pt-2"><dt className="font-semibold">Due now</dt><dd className="font-bold tabular-nums">{money(st.totalDue, db.school.currency)}</dd></div>
+          {(() => { const y = yearStatus(db, child); return <div className="flex justify-between"><dt className="font-semibold">Left for the whole year</dt><dd className="font-bold text-rose-600 tabular-nums">{money(y.totalLeft, db.school.currency)}</dd></div>; })()}
         </dl>
       </Card>
     </div>

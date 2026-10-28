@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRightLeft, UserPlus } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { can } from '../lib/permissions';
-import { currentTerm, feeStatus } from '../lib/finance';
+import { currentTerm, feeStatus, yearStatus } from '../lib/finance';
 import { exportExcel, exportTablePDF } from '../lib/exporters';
 import { REQUIRED_DOCS, STUDENT_STATUS, age, fullName, money, today } from '../lib/utils';
 import { Avatar, Badge, Button, Card, DataTable, ExportButtons, FeeBadge, Field, Modal, PageHeader, SearchInput, Select, useToast } from '../components/ui';
@@ -29,8 +29,8 @@ export default function Students() {
       .filter((s) => (f.status === 'all' ? true : s.status === f.status))
       .filter((s) => !f.classId || s.classId === f.classId)
       .filter((s) => !f.gender || s.gender === f.gender)
-      .map((s) => ({ ...s, fee: feeStatus(db, s, term.id), missingDocs: REQUIRED_DOCS.filter((d) => !s.documents.some((x) => x.name === d)) }))
-      .filter((s) => !f.fee || (f.fee === 'owing' ? s.fee.totalDue > 0 : s.fee.state === f.fee))
+      .map((s) => ({ ...s, fee: feeStatus(db, s, term.id), year: yearStatus(db, s), missingDocs: REQUIRED_DOCS.filter((d) => !s.documents.some((x) => x.name === d)) }))
+      .filter((s) => !f.fee || (f.fee === 'owing' ? s.year.totalLeft > 0 : s.fee.state === f.fee))
       .filter((s) => !f.docs || s.missingDocs.length > 0)
       .filter((s) => {
         if (!needle) return true;
@@ -129,8 +129,8 @@ export default function Students() {
             { key: 'age', label: 'Age', render: (s) => age(s.dob) },
             { key: 'guardian', label: 'Parent / Guardian', render: (s) => { const g = db.guardians.find((x) => x.id === s.guardianIds[0]); return g ? <div><p>{g.name}</p><p className="text-xs text-slate-500">{g.phone}</p></div> : '—'; } },
             ...(showFees ? [
-              { key: 'fee', label: 'Term fees', render: (s) => <FeeBadge state={s.fee.state} /> },
-              { key: 'due', label: 'Owing', align: 'right', render: (s) => (s.fee.totalDue ? <span className="font-semibold text-rose-600">{money(s.fee.totalDue, '')}</span> : '—') },
+              { key: 'fee', label: 'School fees (year)', render: (s) => (s.year.billed ? <div className="text-xs"><p><span className="text-slate-500">Paid</span> <b className="text-emerald-700 tabular-nums">{money(s.year.paid, '')}</b> <span className="text-slate-400">of {money(s.year.billed, '')}</span></p><FeeBadge state={s.fee.state} /></div> : '—') },
+              { key: 'due', label: 'Left for the year', align: 'right', render: (s) => (s.year.totalLeft ? <div><span className="font-semibold text-rose-600 tabular-nums">{money(s.year.totalLeft, '')}</span>{s.year.arrears > 0 && <p className="text-xs text-slate-500">incl. {money(s.year.arrears, '')} arrears</p>}</div> : <span className="text-emerald-700">Cleared</span>) },
             ] : []),
             { key: 'status', label: 'Status', render: (s) => (
               <div className="flex flex-wrap gap-1">

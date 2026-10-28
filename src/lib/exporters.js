@@ -308,25 +308,27 @@ export function reportCardsPDF({ school, cards, filename }) {
       margin: { left: 14, right: 14 },
     });
     y = doc.lastAutoTable.finalY + 3;
+    const seqs = r.sequences?.length ? r.sequences : [];
+    const fmt = (v) => (v === undefined || v === null || v === '' ? '-' : Number(v).toFixed(2));
     const rows = c.subjects.map((s) => {
       const m = r.marks?.[s.name];
       const has = m !== undefined && m !== null && m !== '';
-      return [clean(s.name), String(s.coef), has ? Number(m).toFixed(2) : '-', has ? (Number(m) * s.coef).toFixed(2) : '-', has ? markRemark(Number(m)) : ''];
+      return [clean(s.name), String(s.coef), ...seqs.map((q) => fmt(r.seqMarks?.[s.name]?.[q])), has ? Number(m).toFixed(2) : '-', has ? (Number(m) * s.coef).toFixed(2) : '-', has ? markRemark(Number(m)) : ''];
     });
     const done = c.subjects.filter((s) => r.marks?.[s.name] !== undefined && r.marks?.[s.name] !== '' && r.marks?.[s.name] !== null);
     const coefs = done.reduce((t, s) => t + Number(s.coef), 0);
     const total = done.reduce((t, s) => t + Number(r.marks[s.name]) * Number(s.coef), 0);
     autoTable(doc, {
       startY: y,
-      head: [['Subject', 'Coef', 'Mark /20', 'Mark x Coef', 'Remark']],
+      head: [['Subject', 'Coef', ...seqs.map((q) => `Seq ${q}`), seqs.length ? 'Term /20' : 'Mark /20', 'Mark x Coef', 'Remark']],
       body: rows,
-      foot: [['Total', String(coefs), '', total.toFixed(2), '']],
+      foot: [['Total', String(coefs), ...seqs.map(() => ''), '', total.toFixed(2), '']],
       styles: { fontSize: 9, cellPadding: 1.8 },
       headStyles: { fillColor: BRAND },
       footStyles: { fillColor: [236, 232, 222], textColor: 20 },
-      columnStyles: { 1: { halign: 'center', cellWidth: 16 }, 2: { halign: 'right', cellWidth: 24 }, 3: { halign: 'right', cellWidth: 28 }, 4: { cellWidth: 34 } },
+      columnStyles: Object.fromEntries([[1, { halign: 'center', cellWidth: 14 }], ...seqs.map((_, i) => [2 + i, { halign: 'right', cellWidth: 18 }]), [2 + seqs.length, { halign: 'right', cellWidth: 22, fontStyle: 'bold' }], [3 + seqs.length, { halign: 'right', cellWidth: 24 }], [4 + seqs.length, { cellWidth: 28 }]]),
       // Keep the totals row aligned with the columns above it.
-      didParseCell: (d) => { if (d.section === 'foot') d.cell.styles.halign = d.column.index === 1 ? 'center' : d.column.index >= 2 && d.column.index <= 3 ? 'right' : 'left'; },
+      didParseCell: (d) => { if (d.section === 'foot') d.cell.styles.halign = d.column.index === 1 ? 'center' : d.column.index >= 2 && d.column.index <= 3 + seqs.length ? 'right' : 'left'; },
       margin: { left: 14, right: 14 },
     });
     y = doc.lastAutoTable.finalY + 4;

@@ -2,12 +2,13 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, BookOpenCheck, CalendarCheck, CheckCircle2, Clock, GraduationCap, Users } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { currentTerm } from '../lib/finance';
-import { classSubjects } from '../lib/subjects';
+import { canEnterMarks, classSubjects, termSequences } from '../lib/subjects';
 import { DAYS, teacherLessons } from '../lib/timetable';
 import { fmtDate, today } from '../lib/utils';
 import { Badge, Button, Card, PageHeader, StatCard } from '../components/ui';
 import { Progress } from '../components/Charts';
 import { AnnouncementList, visibleAnnouncements } from './Announcements';
+import { MyAttendance } from '../components/StaffAttendance';
 
 const same = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
@@ -27,18 +28,12 @@ export default function TeacherHome() {
 
   // Every class + subject this teacher enters marks for: all subjects of their own class, plus their own subjects elsewhere.
   const sheets = [];
-  if (cls) for (const s of classSubjects(cls)) sheets.push({ c: cls, subject: s.name });
-  for (const t of me?.teaching || []) {
-    for (const cid of t.classIds || []) {
-      const c = db.classes.find((x) => x.id === cid);
-      const subject = c && classSubjects(c).find((s) => same(s.name, t.subject));
-      if (subject && !sheets.some((x) => x.c.id === cid && x.subject === subject.name)) sheets.push({ c, subject: subject.name });
-    }
-  }
+  for (const c of db.classes) for (const s of classSubjects(c)) if (canEnterMarks(db.staff, user, c, s.name)) sheets.push({ c, subject: s.name });
+  const seqs = termSequences(db.sessions, term.id);
   const progress = sheets.map((x) => {
     const total = db.students.filter((s) => s.enrollments?.[term.sessionId] === x.c.id && s.status === 'active').length;
-    const sheet = (db.marks || []).find((m) => m.classId === x.c.id && m.termId === term.id && same(m.subject, x.subject));
-    return { ...x, total, done: sheet ? Object.keys(sheet.marks || {}).length : 0 };
+    const counts = seqs.map((q) => { const sh = (db.marks || []).find((m) => m.classId === x.c.id && m.termId === term.id && same(m.subject, x.subject) && m.sequence === q); return sh ? Object.keys(sh.marks || {}).length : 0; });
+    return { ...x, total, counts, done: Math.min(...counts) };
   });
   const missing = progress.filter((p) => p.total && p.done < p.total);
   const pendingConfirm = !!me?.teachingRequest;
@@ -60,7 +55,7 @@ export default function TeacherHome() {
         <StatCard label="My class" value={cls ? cls.name : '—'} icon={GraduationCap} hint={cls ? `${pupils.length} pupils` : 'Not a class teacher'} />
         <StatCard label="Lessons today" value={todays.length} icon={Clock} tone="purple" hint={`${lessons.length} a week`} />
         <StatCard label="Absent today" value={register ? register.absent?.length || 0 : '—'} icon={Users} tone="red" hint={cls ? (register ? 'from today’s register' : 'register not taken') : ''} />
-        <StatCard label="Marks to finish" value={missing.length} icon={BookOpenCheck} tone="amber" hint={`of ${progress.length} subject sheets`} />
+        <StatCard label="Marks to finish" value={missing.length} icon={BookOpenCheck} tone="amber" hint={`of ${progress.length} subjects · sequences ${seqs.join(' & ')}`} />
       </div>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
@@ -82,7 +77,7 @@ export default function TeacherHome() {
             <ul className="grid gap-3 sm:grid-cols-2">
               {progress.map((p) => (
                 <li key={`${p.c.id}-${p.subject}`} className="text-sm">
-                  <div className="flex justify-between gap-2"><span className="truncate"><b className="text-slate-800">{p.subject}</b> · {p.c.name}</span><span className="shrink-0 text-slate-500 tabular-nums">{p.done}/{p.total}</span></div>
+                  <div className="flex justify-between gap-2"><span className="truncate"><b className="text-slate-800">{p.subject}</b> · {p.c.name}</span><span className="shrink-0 text-xs text-slate-500 tabular-nums">{seqs.map((q, i) => `S${q} ${p.counts[i]}/${p.total}`).join(' · ')}</span></div>
                   <Progress value={p.done} max={p.total || 1} tone={p.total && p.done >= p.total ? 'bg-emerald-500' : 'bg-amber-500'} />
                 </li>
               ))}
@@ -99,7 +94,8 @@ export default function TeacherHome() {
             ))}
           </div>
         </Card>
-        <div className="xl:col-span-2">
+        <div className="space-y-6 xl:col-span-2">
+          <MyAttendance />
           <Card title="School news" actions={<Badge tone="slate">{fmtDate(day)}</Badge>}>
             {news.length ? <AnnouncementList items={news} /> : <p className="text-sm text-slate-500">No announcements.</p>}
           </Card>

@@ -4,7 +4,7 @@ import { useStore } from '../lib/store';
 import { allTerms } from '../lib/finance';
 import { downloadReportCards } from '../lib/documents';
 import { can } from '../lib/permissions';
-import { SUBJECTS, classSubjects, ordinal } from '../lib/subjects';
+import { SUBJECTS, canEnterMarks, classSubjects, ordinal, termSequences } from '../lib/subjects';
 import { fullName } from '../lib/utils';
 import { Badge, Button, Card, Empty, Field, Input, Modal, PageHeader, Select, Tabs, useToast } from '../components/ui';
 
@@ -14,16 +14,11 @@ const same = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /** Classes where the user may enter marks: the office everywhere; a teacher in their class and where they teach a subject. */
 function markClasses(db, user) {
-  if (isOffice(user)) return db.classes.map((c) => c.id);
+  if (user.role === 'superadmin') return db.classes.map((c) => c.id);
+  if (user.role !== 'teacher') return [];
   const me = db.staff.find((s) => s.id === user.staffId);
   const own = db.classes.find((c) => c.teacherId && c.teacherId === user.staffId)?.id;
   return [...new Set([own, ...(me?.teaching || []).flatMap((t) => t.classIds || [])].filter(Boolean))];
-}
-function canEnter(db, user, cls, subject) {
-  if (isOffice(user)) return true;
-  if (cls.teacherId && cls.teacherId === user.staffId) return true;
-  const me = db.staff.find((s) => s.id === user.staffId);
-  return (me?.teaching || []).some((t) => same(t.subject, subject) && (t.classIds || []).includes(cls.id));
 }
 const enrolled = (db, classId, term, termId) => db.students
   .filter((s) => s.enrollments?.[term.sessionId] === classId && (s.status === 'active' || db.academicRecords.some((r) => r.studentId === s.id && r.termId === termId)))
@@ -39,15 +34,16 @@ export default function Academics({ lockedClassId }) {
   const ownClass = db.classes.find((c) => c.teacherId && c.teacherId === user.staffId)?.id;
   const classIds = lockedClassId ? [lockedClassId] : markClasses(db, user);
   const canResults = isOffice(user) || !!ownClass;
-  const [tab, setTab] = useState('marks');
+  const canMarks = classIds.length > 0;
+  const [tab, setTab] = useState(canMarks ? 'marks' : 'results');
   const [termId, setTermId] = useState(db.settings.currentTermId);
-  if (!classIds.length) return <><PageHeader title="Marks & report cards" /><Empty title="No class or subject assigned" message="Ask the office to make you a class teacher, or to list the subjects and classes you teach on your staff record." /></>;
+  if (!classIds.length && !canResults) return <><PageHeader title="Marks & report cards" /><Empty title="No class or subject assigned" message="Ask the office to make you a class teacher, or to list the subjects and classes you teach on your staff record." /></>;
   const terms = allTerms(db);
   return (
     <>
       {!lockedClassId && <PageHeader title="Marks & report cards" subtitle="Each teacher enters the marks of the subjects they teach. Averages, positions and report cards follow automatically." />}
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <Tabs tabs={[{ id: 'marks', label: 'Enter marks' }, ...(canResults ? [{ id: 'results', label: 'Class results & report cards' }] : [])]} value={tab} onChange={setTab} />
+        <Tabs tabs={[...(canMarks ? [{ id: 'marks', label: 'Enter marks' }] : []), ...(canResults ? [{ id: 'results', label: 'Class results & report cards' }] : [])]} value={tab} onChange={setTab} />
         <Field label="Term"><Select className="w-56" value={termId} onChange={(e) => setTermId(e.target.value)} options={terms.map((t) => ({ value: t.id, label: t.label }))} /></Field>
       </div>
       {tab === 'marks' ? <EnterMarks classIds={classIds} termId={termId} /> : <ClassResults classIds={lockedClassId ? [lockedClassId] : isOffice(user) ? db.classes.map((c) => c.id) : [ownClass]} termId={termId} />}
@@ -62,53 +58,67 @@ function EnterMarks({ classIds, termId }) {
   const [classId, setClassId] = useState(classes[0]?.id);
   const cls = db.classes.find((c) => c.id === classId) || classes[0];
   const term = allTerms(db).find((t) => t.id === termId);
-  const subjects = classSubjects(cls).filter((s) => canEnter(db, user, cls, s.name));
+  // Only the subjects this teacher is responsible for in this class.
+  const subjects = classSubjects(cls).filter((s) => canEnterMarks(db.staff, user, cls, s.name));
   const [subject, setSubject] = useState(subjects[0]?.name || '');
+  const sequences = termSequences(db.sessions, termId);
+  const [sequence, setSequence] = useState(sequences[0]);
+  useEffect(() => { setSequence(termSequences(db.sessions, termId)[0]); }, [termId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!subjects.some((s) => s.name === subject)) setSubject(subjects[0]?.name || ''); }, [classId]); // eslint-disable-line react-hooks/exhaustive-deps
   const pupils = useMemo(() => (cls && term ? enrolled(db, cls.id, term, termId) : []), [db, cls, term, termId]);
-  const sheet = (db.marks || []).find((m) => m.classId === cls?.id && m.termId === termId && same(m.subject, subject));
+  const sheetOf = (subj, seq) => (db.marks || []).find((m) => m.classId === cls?.id && m.termId === termId && same(m.subject, subj) && m.sequence === seq);
+  const sheet = sheetOf(subject, sequence);
+  // A sheet another teacher entered is shown but can't be changed (the proprietor may correct it).
+  const lockedBy = sheet && sheet.enteredBy !== user.id && user.role !== 'superadmin' ? db.users.find((u) => u.id === sheet.enteredBy)?.name || 'another teacher' : null;
   const [values, setValues] = useState({});
   const [busy, setBusy] = useState(false);
-  useEffect(() => { setValues(Object.fromEntries(pupils.map((p) => [p.id, sheet?.marks?.[p.id] ?? '']))); }, [cls?.id, termId, subject, sheet?.updatedAt, pupils.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setValues(Object.fromEntries(pupils.map((p) => [p.id, sheet?.marks?.[p.id] ?? '']))); }, [cls?.id, termId, subject, sequence, sheet?.updatedAt, pupils.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
     if (Object.values(values).some((v) => v !== '' && !(Number(v) >= 0 && Number(v) <= 20))) return notify('Marks must be between 0 and 20.');
     setBusy(true);
     try {
-      await api.request('/api/ops', { method: 'POST', body: { ops: [{ t: 'put', c: 'marks', v: { classId: cls.id, termId, subject, marks: values } }] } });
+      await api.request('/api/ops', { method: 'POST', body: { ops: [{ t: 'put', c: 'marks', v: { classId: cls.id, termId, subject, sequence, marks: values } }] } });
       await api.reload();
-      api.log('Entered marks', `${subject} · ${cls.name} · ${term.label}`);
-      notify(`${subject} marks saved for ${Object.values(values).filter((v) => v !== '').length} pupil(s). Averages and positions are updated.`);
+      api.log('Entered marks', `${subject} · ${cls.name} · sequence ${sequence}`);
+      notify(`Sequence ${sequence}: ${subject} marks saved for ${Object.values(values).filter((v) => v !== '').length} pupil(s). Averages and positions are updated.`);
     } catch (e) { notify(e.message); } finally { setBusy(false); }
   };
 
   // Which subjects of this class already have marks (helps the class teacher see what is missing).
   const progress = classSubjects(cls).map((s) => {
-    const sh = (db.marks || []).find((m) => m.classId === cls?.id && m.termId === termId && same(m.subject, s.name));
-    return { ...s, count: sh ? Object.keys(sh.marks || {}).length : 0, by: sh && db.users.find((u) => u.id === sh.enteredBy)?.name };
+    const sheets = sequences.map((q) => sheetOf(s.name, q));
+    const owner = sheets.find(Boolean);
+    return { ...s, counts: sheets.map((sh) => (sh ? Object.keys(sh.marks || {}).length : 0)), by: owner && db.users.find((u) => u.id === owner.enteredBy)?.name, mine: subjects.some((x) => x.name === s.name) };
   });
 
   return (
     <>
       {toast}
       <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
-        <Card bodyClass="" title={subject ? `${subject} · ${cls?.name}` : cls?.name} actions={<Button icon={Save} disabled={busy || !subject || !pupils.length} onClick={save}>{busy ? 'Saving…' : 'Save marks'}</Button>}>
-          <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-2">
+        <Card bodyClass="" title={subject ? `${subject} · ${cls?.name} · Sequence ${sequence}` : cls?.name} actions={<Button icon={Save} disabled={busy || !subject || !pupils.length || !!lockedBy} onClick={save}>{busy ? 'Saving…' : 'Save marks'}</Button>}>
+          <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-3">
             <Field label="Class"><Select value={cls?.id} onChange={(e) => setClassId(e.target.value)} disabled={classes.length < 2} options={classes.map((c) => ({ value: c.id, label: c.name }))} /></Field>
             <Field label="Subject"><Select value={subject} onChange={(e) => setSubject(e.target.value)} disabled={!subjects.length} options={subjects.map((s) => ({ value: s.name, label: `${s.name} (coef ${s.coef})` }))} placeholder={subjects.length ? undefined : 'No subject you teach here'} /></Field>
+            <Field label="Sequence">
+              <div className="grid grid-cols-2 gap-1 rounded-md bg-slate-100 p-1" role="radiogroup" aria-label="Sequence">
+                {sequences.map((q) => <button key={q} type="button" role="radio" aria-checked={sequence === q} onClick={() => setSequence(q)} className={`rounded px-2 py-1.5 text-sm font-semibold ${sequence === q ? 'bg-white text-brand-800 shadow-sm' : 'text-slate-500'}`}>Sequence {q}</button>)}
+              </div>
+            </Field>
           </div>
           {!subjects.length ? (
             <Empty title="You don't teach a subject of this class" message="Subjects on your staff record must match the class's subject names. Ask the office to check both." />
           ) : !pupils.length ? <Empty title="No pupils in this class for that term" /> : (
             <>
-              {sheet && <p className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-600">Last saved by {db.users.find((u) => u.id === sheet.enteredBy)?.name || 'a teacher'} · {new Date(sheet.updatedAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</p>}
+              {lockedBy && <p className="border-b border-rose-100 bg-rose-50 px-4 py-2 text-sm text-rose-800">These marks were entered by {lockedBy}. Only they can change them.</p>}
+              {sheet && !lockedBy && <p className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-600">Last saved by {db.users.find((u) => u.id === sheet.enteredBy)?.name || 'a teacher'} · {new Date(sheet.updatedAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</p>}
               <ul className="divide-y divide-slate-100">
                 {pupils.map((p, i) => (
                   <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-2">
                     <div className="min-w-0"><p className="truncate font-semibold text-slate-800"><span className="mr-2 text-xs text-slate-400 tabular-nums">{i + 1}</span>{fullName(p)}</p><p className="font-mono text-xs text-slate-500">{p.regNo}</p></div>
                     <div className="flex items-center gap-1.5">
                       <input className="input w-20 text-center tabular-nums" type="number" inputMode="decimal" step="0.25" min="0" max="20"
-                        value={values[p.id] ?? ''} onChange={(e) => setValues({ ...values, [p.id]: e.target.value })} aria-label={`${subject} mark for ${fullName(p)}`} />
+                        value={values[p.id] ?? ''} disabled={!!lockedBy} onChange={(e) => setValues({ ...values, [p.id]: e.target.value })} aria-label={`${subject} mark for ${fullName(p)}`} />
                       <span className="text-xs text-slate-400">/20</span>
                     </div>
                   </li>
@@ -122,10 +132,10 @@ function EnterMarks({ classIds, termId }) {
             {progress.map((s) => (
               <li key={s.name} className="flex items-start justify-between gap-2">
                 <span className="flex items-start gap-1.5">
-                  {s.count ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" /> : <CircleDashed className="mt-0.5 size-4 shrink-0 text-slate-300" />}
-                  <span><span className={s.count ? 'text-slate-800' : 'text-slate-500'}>{s.name}</span>{s.by && <span className="block text-xs text-slate-500">{s.by}</span>}</span>
+                  {s.counts.every((c) => c >= pupils.length && pupils.length) ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" /> : <CircleDashed className="mt-0.5 size-4 shrink-0 text-slate-300" />}
+                  <span><span className={s.mine ? 'font-semibold text-slate-800' : 'text-slate-500'}>{s.name}</span>{s.by && <span className="block text-xs text-slate-500">{s.by}</span>}</span>
                 </span>
-                <Badge tone={s.count >= pupils.length && pupils.length ? 'green' : s.count ? 'amber' : 'slate'}>{s.count}/{pupils.length}</Badge>
+                <span className="flex shrink-0 gap-1">{s.counts.map((c, i) => <Badge key={i} tone={c >= pupils.length && pupils.length ? 'green' : c ? 'amber' : 'slate'}>S{sequences[i]} {c}/{pupils.length}</Badge>)}</span>
               </li>
             ))}
           </ul>
@@ -246,7 +256,7 @@ function ClassResults({ classIds, termId }) {
 }
 
 /** The office sets each class's subjects and coefficients (they appear on the report card in this order). */
-function SubjectsEditor({ cls, onClose, onSaved }) {
+export function SubjectsEditor({ cls, onClose, onSaved }) {
   const { db, api } = useStore();
   const [list, setList] = useState(() => classSubjects(cls).map((s) => ({ ...s })));
   const set = (i, patch) => setList(list.map((s, j) => (j === i ? { ...s, ...patch } : s)));

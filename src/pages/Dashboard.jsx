@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, Banknote, CalendarCheck, CalendarDays, CheckCircle2, ClipboardList, GraduationCap, PackageX, TrendingDown, UserRound } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Banknote, CalendarCheck, CalendarDays, CheckCircle2, ClipboardList, GraduationCap, TrendingDown, UserRound } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { currentSession, currentTerm, feeStatus, payrollTotals } from '../lib/finance';
-import { classSubjects } from '../lib/subjects';
+import { currentSession, currentTerm, feeStatus, payrollTotals, yearStatus } from '../lib/finance';
+import { classSubjects, termSequences } from '../lib/subjects';
 import { fmtDate, fullName, methodLabel, money, monthLabel, num, sum, thisMonth, today } from '../lib/utils';
 import { Badge, Card, DataTable, PageHeader, StatCard } from '../components/ui';
 import { BarChart, Donut, HBarChart, Progress } from '../components/Charts';
@@ -121,7 +121,8 @@ function MarksProgress() {
   const termId = db.settings.currentTermId;
   const rows = [...db.classes].sort((a, b) => a.order - b.order).map((c) => {
     const subjects = classSubjects(c);
-    const done = subjects.filter((s) => (db.marks || []).some((m) => m.classId === c.id && m.termId === termId && m.subject === s.name && Object.keys(m.marks || {}).length)).length;
+    const seqs = termSequences(db.sessions, termId);
+    const done = subjects.filter((s) => seqs.every((q) => (db.marks || []).some((m) => m.classId === c.id && m.termId === termId && m.subject === s.name && m.sequence === q && Object.keys(m.marks || {}).length))).length;
     return { c, done, total: subjects.length };
   }).filter((r) => db.students.some((s) => s.status === 'active' && s.classId === r.c.id));
   return (
@@ -198,6 +199,26 @@ const backupDue = (db) => {
   return !last || Date.now() - new Date(last.at).getTime() > 30 * 24 * 3600 * 1000;
 };
 
+/** All pupils' fees for the whole school year: billed, paid and left. */
+function YearFeesCard() {
+  const { db } = useStore();
+  const ys = db.students.filter((s) => s.status === 'active').map((s) => yearStatus(db, s));
+  const billed = sum(ys, (y) => y.billed);
+  const paid = sum(ys, (y) => y.paid);
+  const left = sum(ys, (y) => y.totalLeft);
+  return (
+    <Card title="School fees for the whole year" actions={<Link to="/fees/not-completed" className="text-sm font-semibold text-brand-700 hover:underline">Who owes</Link>}>
+      <dl className="space-y-2 text-sm">
+        <div className="flex justify-between"><dt className="text-slate-600">Fees for the year</dt><dd className="font-semibold tabular-nums">{money(billed, '')}</dd></div>
+        <div className="flex justify-between"><dt className="text-slate-600">Paid so far</dt><dd className="font-semibold text-emerald-700 tabular-nums">{money(paid, '')}</dd></div>
+        <div className="flex justify-between border-t border-slate-100 pt-2"><dt className="font-semibold">Left to collect</dt><dd className="font-bold text-rose-600 tabular-nums">{money(left, '')}</dd></div>
+      </dl>
+      <div className="mt-3"><Progress value={paid} max={billed || 1} tone="bg-emerald-500" /></div>
+      <p className="mt-1 text-xs text-slate-500">{billed ? Math.round((paid / billed) * 100) : 0}% of the year’s fees collected</p>
+    </Card>
+  );
+}
+
 // ---------- Proprietor ----------
 
 function OwnerDashboard() {
@@ -252,11 +273,9 @@ function BursarDashboard() {
   const f = useFigures();
   const cur = db.school.currency;
   const run = f.latestRun;
-  const lowStock = db.inventory.filter((i) => i.quantity <= i.reorderLevel);
   const items = [
     { label: 'Parent payments to verify', count: db.paymentRequests.filter((r) => r.status === 'pending').length, to: '/fees/online', tone: 'red' },
     { label: run ? `Salaries not yet paid for ${monthLabel(run.month)}` : 'Salaries not yet paid', count: run ? run.items.filter((i) => !i.paid).length : 0, to: '/payroll' },
-    { label: 'Items low in stock', count: lowStock.length, to: '/inventory' },
   ];
   const top = [...f.debtors].sort((a, b) => b.totalDue - a.totalDue).slice(0, 6);
   return (
@@ -283,12 +302,7 @@ function BursarDashboard() {
           ) : <p className="px-5 py-4 text-sm text-emerald-700">No pupil owes anything.</p>}
         </Card>
         <PayrollStatus run={run} />
-        <Card title="Low-stock alerts" actions={<PackageX className="size-4 text-rose-500" />}>
-          {lowStock.length ? (
-            <ul className="space-y-2 text-sm">{lowStock.map((i) => <li key={i.id} className="flex items-center justify-between gap-2"><span className="truncate text-slate-700">{i.name}{i.size !== '—' ? ` (${i.size})` : ''}</span><Badge tone={i.quantity === 0 ? 'red' : 'amber'}>{i.quantity} left</Badge></li>)}</ul>
-          ) : <p className="text-sm text-slate-500">All items are above their reorder level.</p>}
-          <Link to="/inventory" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:underline">Manage stock</Link>
-        </Card>
+        <YearFeesCard />
       </div>
       <div className="mt-6"><RecentPayments f={f} /></div>
     </>

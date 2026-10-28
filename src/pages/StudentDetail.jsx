@@ -3,7 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { Download, Eye, FileUp, History, Pencil, Receipt, ShieldCheck, ShoppingBag, Trash2, BookOpen, Wallet, Users, IdCard, FileText } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { can } from '../lib/permissions';
-import { allTerms, billLines, currentTerm, feeStatus, termPaid, termsUpTo } from '../lib/finance';
+import { allTerms, billLines, currentTerm, feeStatus, termPaid, termsUpTo, yearStatus } from '../lib/finance';
 import { downloadReceipt, downloadReportCards } from '../lib/documents';
 import { OPTIONAL_DOCS, REQUIRED_DOCS, STUDENT_STATUS, age, feeTypeLabel, fmtDate, fullName, methodLabel, money, readFileAsDataURL, uid } from '../lib/utils';
 import { Avatar, Badge, Button, Card, DataTable, Empty, FeeBadge, Field, Info, PageHeader, Select, StatCard, Tabs, useToast } from '../components/ui';
@@ -22,6 +22,7 @@ export default function StudentDetail() {
   const showFees = can(user, 'fees.view');
   const term = currentTerm(db);
   const fee = feeStatus(db, s, term.id);
+  const year = yearStatus(db, s);
   const missing = REQUIRED_DOCS.filter((d) => !s.documents.some((x) => x.name === d));
 
   const tabs = [
@@ -30,7 +31,6 @@ export default function StudentDetail() {
     ...(showFees ? [{ id: 'fees', label: 'Fees', icon: Wallet }] : []),
     { id: 'academics', label: 'Academic records', icon: BookOpen },
     { id: 'docs', label: 'Documents', icon: FileText, count: s.documents.length },
-    ...(showFees ? [{ id: 'purchases', label: 'Purchases', icon: ShoppingBag }] : []),
     { id: 'history', label: 'History', icon: History },
   ];
 
@@ -60,7 +60,8 @@ export default function StudentDetail() {
       {showFees && s.status === 'active' && (
         <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           <StatCard label={`Billed · ${term.name}`} value={money(fee.billed, db.school.currency)} icon={Wallet} />
-          <StatCard label="Paid this term" value={money(fee.paid, db.school.currency)} tone="green" hint={<FeeBadge state={fee.state} />} />
+          <StatCard label="Paid this year" value={money(year.paid, db.school.currency)} tone="green" hint={`of ${money(year.billed, '')} for the year`} />
+          <StatCard label="Left for the year" value={money(year.totalLeft, db.school.currency)} tone={year.totalLeft ? 'red' : 'green'} hint={year.arrears ? `incl. ${money(year.arrears, '')} from earlier years` : <FeeBadge state={fee.state} />} />
           <StatCard label="Term balance" value={money(fee.balance, db.school.currency)} tone="amber" />
           <StatCard label="Arrears (earlier terms)" value={money(fee.arrears, db.school.currency)} tone="red" />
         </div>
@@ -71,7 +72,6 @@ export default function StudentDetail() {
       {tab === 'fees' && <Fees s={s} />}
       {tab === 'academics' && <Academic s={s} />}
       {tab === 'docs' && <Docs s={s} notify={notify} />}
-      {tab === 'purchases' && <Purchases s={s} />}
       {tab === 'history' && <Timeline s={s} />}
     </>
   );

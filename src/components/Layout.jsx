@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
-  AlertTriangle, Banknote, CalendarCheck, CalendarDays, CheckCircle2, CircleDashed, TrendingDown, BarChart3, BookOpen, BookOpenCheck, Building2, ClipboardList, GraduationCap, LayoutDashboard, LogOut,
+  AlertTriangle, Banknote, ListChecks, CalendarCheck, CalendarDays, CheckCircle2, CircleDashed, TrendingDown, BarChart3, BookOpen, BookOpenCheck, Building2, ClipboardList, GraduationCap, LayoutDashboard, LogOut,
   CloudOff, Megaphone, Menu, Smartphone, UserPlus, Package, Receipt, Settings2, ShieldCheck, Users, UserRound, Wallet, X, ArrowUpCircle, Home, Contact,
 } from 'lucide-react';
 import { useStore } from '../lib/store';
@@ -49,6 +49,7 @@ const NAV = [
     { to: '/admissions', label: 'Admission applications', icon: ClipboardList, perm: 'students.edit', badge: (db) => db.admissionApplications.filter((a) => a.status === 'pending').length },
     { to: '/guardians', label: 'Parents & Guardians', icon: Contact, perm: 'guardians.edit' },
     { to: '/attendance', label: 'Daily attendance', icon: CalendarCheck, perm: ['myclass', 'students.edit'] },
+    { to: '/subjects', label: 'Subjects by class', icon: ListChecks, perm: 'students.edit' },
     { to: '/timetable', label: 'Timetable', icon: CalendarDays, perm: ['myclass', 'academics.edit', 'students.edit'] },
     { to: '/academics', label: 'Marks & report cards', icon: BookOpenCheck, perm: 'academics.edit' },
     { to: '/promotion', label: 'Promotion & Exits', icon: ArrowUpCircle, perm: 'promotion' },
@@ -62,7 +63,6 @@ const NAV = [
     { to: '/fees/structure', label: 'Fee Structure', icon: ClipboardList, perm: 'fees.setup' },
     { to: '/payroll', label: 'Payroll', icon: Wallet, perm: 'payroll' },
     { to: '/expenses', label: 'Expenses & cash flow', icon: TrendingDown, perm: 'payroll' },
-    { to: '/inventory', label: 'Uniforms & Materials', icon: Package, perm: 'inventory' },
   ] },
   { group: 'Administration', items: [
     { to: '/staff', label: 'Staff', icon: UserRound, perm: 'staff.view' },

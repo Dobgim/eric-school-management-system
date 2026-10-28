@@ -76,8 +76,19 @@ export function payrollTotals(run) {
   };
 }
 
+/** A staff member's monthly pay: the salary typed on their record, or else their salary scale. */
+export function staffPay(db, staff) {
+  const own = staff?.salary;
+  if (own && Number(own.basic) > 0) {
+    return { name: 'Own salary', basic: Number(own.basic) || 0, housing: Number(own.housing) || 0, transport: Number(own.transport) || 0, own: true };
+  }
+  const g = db.salaryScales.find((x) => x.id === staff?.gradeId);
+  return g ? { ...g, own: false } : { name: '', basic: 0, housing: 0, transport: 0, own: false, none: true };
+}
+export const grossPay = (p) => (Number(p.basic) || 0) + (Number(p.housing) || 0) + (Number(p.transport) || 0);
+
 export function computePayrollItem(db, staff, month) {
-  const g = db.salaryScales.find((x) => x.id === staff.gradeId) || { basic: 0, housing: 0, transport: 0 };
+  const g = staffPay(db, staff);
   const adj = db.salaryAdjustments.filter((a) => a.staffId === staff.id && a.month === month);
   const bonus = sum(adj.filter((a) => a.type === 'bonus'), (a) => a.amount);
   const advance = sum(adj.filter((a) => a.type === 'advance'), (a) => a.amount);
@@ -154,4 +165,16 @@ export function scopeStatus(db, student, scope) {
   const billed = sum(terms, (t) => termBill(db, student, t.id));
   const paid = sum(terms, (t) => termPaid(db, student.id, t.id));
   return { billed, paid, left: Math.max(0, billed - paid), complete: billed > 0 && paid >= billed };
+}
+
+/**
+ * The pupil's whole school year: all the year's fees, what has been paid, what is left — plus anything still owed
+ * from earlier years. `left` is what remains of this year's fees; `totalLeft` adds the earlier arrears.
+ */
+export function yearStatus(db, student) {
+  const st = scopeStatus(db, student, 'year');
+  const first = sessionTerms(db)[0]?.start || '9999';
+  const earlier = allTerms(db).filter((t) => t.sessionId !== db.settings.currentSessionId && t.start < first);
+  const arrears = sum(earlier, (t) => Math.max(0, termBill(db, student, t.id) - termPaid(db, student.id, t.id)));
+  return { ...st, paid: Math.min(st.paid, st.billed), arrears, totalLeft: st.left + arrears };
 }

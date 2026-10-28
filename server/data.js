@@ -2,13 +2,13 @@
 // and every change it sends is checked here before it reaches the database.
 import { randomBytes } from 'node:crypto';
 import { hashPassword, toClientUser } from './auth.js';
-import { classSubjects, weightedAverage } from '../src/lib/subjects.js';
+import { canEnterMarks, classSubjects, termSequences, weightedAverage } from '../src/lib/subjects.js';
 
 export const COLLECTIONS = [
   'students', 'guardians', 'classes', 'facilities', 'sessions', 'calendarEvents', 'categories', 'feeItems',
   'payments', 'staff', 'salaryScales', 'salaryAdjustments', 'payrollRuns', 'inventory', 'stockMovements', 'sales',
   'academicRecords', 'promotionRecommendations', 'announcements', 'activityLog', 'paymentRequests', 'notifications',
-  'admissionApplications', 'invites', 'attendance', 'expenses', 'marks', 'timetables',
+  'admissionApplications', 'invites', 'attendance', 'expenses', 'marks', 'timetables', 'staffAttendance',
 ];
 
 export const newId = (p = '') => p + Date.now().toString(36) + randomBytes(3).toString('hex');
@@ -34,6 +34,8 @@ export async function loadAll(q) {
   return out;
 }
 
+// Staff see only their own days in the staff register.
+const ownStaffAttendance = (all, user) => all.staffAttendance.map((a) => ({ id: a.id, date: a.date, absent: (a.absent || []).filter((id) => id === user.staffId), late: (a.late || []).filter((id) => id === user.staffId) }));
 const teacherClassId = (all, user) => all.classes.find((c) => c.teacherId && c.teacherId === user.staffId)?.id || null;
 const parentChildIds = (all, user) => all.students.filter((s) => (s.guardianIds || []).includes(user.guardianId)).map((s) => s.id);
 const forUser = (n, user) => n.by !== user.id && ((n.userIds || []).includes(user.id) || (n.roles || []).includes(user.role));
@@ -88,6 +90,7 @@ export function viewFor(user, all) {
       ...empty, ...base,
       settings: { currentSessionId: all.settings.currentSessionId, currentTermId: all.settings.currentTermId, counters: {} },
       staff: [...all.staff.filter((s) => s.id === user.staffId), ...teacherDirectory(all).filter((s) => s.id !== user.staffId)],
+      staffAttendance: ownStaffAttendance(all, user),
       salaryScales: ownScale(),
       payrollRuns: ownPay(),
       announcements: all.announcements.filter((a) => a.audience === 'all' || a.audience === 'staff'),
@@ -114,6 +117,7 @@ export function viewFor(user, all) {
       marks: all.marks.filter((m) => m.classId === classId || taught.has(m.classId)),
       // Own class's timetable, and every timetable where this teacher has a lesson.
       timetables: all.timetables.filter((t) => t.classId === classId || Object.values(t.cells || {}).some((c) => c?.teacherId && c.teacherId === user.staffId)),
+      staffAttendance: ownStaffAttendance(all, user),
       attendance: all.attendance.filter((a) => a.classId === classId),
       promotionRecommendations: all.promotionRecommendations.filter((r) => ids.has(r.studentId)),
       announcements: all.announcements.filter((a) => a.audience === 'all' || a.audience === 'staff'),
@@ -136,7 +140,7 @@ export function viewFor(user, all) {
 
 // Collections each office role may change. Teachers and parents are handled row by row below.
 const WRITE = {
-  admin: ['students', 'guardians', 'classes', 'facilities', 'sessions', 'calendarEvents', 'academicRecords', 'promotionRecommendations', 'announcements', 'staff', 'notifications', 'activityLog', 'attendance', 'timetables'],
+  admin: ['students', 'guardians', 'classes', 'facilities', 'sessions', 'calendarEvents', 'academicRecords', 'promotionRecommendations', 'announcements', 'staff', 'notifications', 'activityLog', 'attendance', 'timetables', 'staffAttendance'],
   bursar: ['payments', 'feeItems', 'categories', 'payrollRuns', 'salaryAdjustments', 'salaryScales', 'staff', 'inventory', 'stockMovements', 'sales', 'paymentRequests', 'notifications', 'activityLog', 'expenses'],
 };
 const KV_WRITE = { superadmin: ['school', 'settings'], admin: ['school', 'settings'] };
@@ -250,6 +254,8 @@ export async function applyOps(q, user, ops) {
       throw new Forbidden('Not allowed.');
     }
 
+    // Salaries are set by the super admin or the bursar only.
+    if (c === 'staff' && t === 'put' && user.role === 'admin') { op.v = { ...after, salary: before?.salary, gradeId: before?.gradeId ?? after?.gradeId ?? '', bankName: before?.bankName ?? after?.bankName, accountNo: before?.accountNo ?? after?.accountNo, momoNumber: before?.momoNumber ?? after?.momoNumber }; await putRecord(c, op.v); continue; }
     if (c === 'announcements' && t === 'put') { await writeAnnouncement(all, user, before, after, putRecord, now); continue; }
     if (c === 'attendance' && t === 'put') { await writeAttendance(all, user, before, after, putRecord, now); continue; }
     if (t === 'put') await putRecord(c, after);
@@ -308,34 +314,43 @@ export function markClasses(all, user) {
 }
 
 /** May this user enter marks for this subject in this class? */
-function canEnterMarks(all, user, cls, subject) {
-  if (['superadmin', 'admin'].includes(user.role)) return true;
-  if (user.role !== 'teacher') return false;
-  if (cls.teacherId && cls.teacherId === user.staffId) return true;
-  const me = all.staff.find((s) => s.id === user.staffId);
-  return (me?.teaching || []).some((t) => t.subject.trim().toLowerCase() === subject.toLowerCase() && (t.classIds || []).includes(cls.id));
-}
-
 const termOf = (all, termId) => all.sessions.flatMap((s) => (s.terms || []).map((t) => ({ ...t, sessionId: s.id }))).find((t) => t.id === termId);
 const autoRemark = (avg) => (avg >= 16 ? 'Outstanding performance, keep it up.' : avg >= 12 ? 'Good work. Can do better.' : avg >= 10 ? 'Average. Needs more effort.' : 'Weak. Needs close follow-up at home.');
 
-/** One subject's marks for a class and term, entered by whoever teaches it. Results are then recalculated. */
+/**
+ * One subject's marks for one sequence (evaluation) in a class: entered only by the teacher of that subject.
+ * A sheet entered by one teacher can't be changed by another; the proprietor can correct (it is logged).
+ * Term results are then recalculated.
+ */
 async function writeMarks(all, user, v, putRecord, now) {
   const cls = all.classes.find((c) => c.id === v.classId);
   const term = termOf(all, v.termId);
   const subject = classSubjects(cls).find((s) => s.name.toLowerCase() === String(v.subject || '').trim().toLowerCase());
   if (!cls || !term || !subject) throw new Invalid('Choose the class, term and subject.');
-  if (!canEnterMarks(all, user, cls, subject.name)) throw new Forbidden(`You can only enter marks for the subjects you teach. ${subject.name} in ${cls.name} is not one of them.`);
+  const sequences = termSequences(all.sessions, term.id);
+  const sequence = Number(v.sequence);
+  if (!sequences.includes(sequence)) throw new Invalid(`Choose sequence ${sequences.join(' or ')} for this term.`);
+  if (!canEnterMarks(all.staff, user, cls, subject.name)) throw new Forbidden(`Only the teacher of ${subject.name} in ${cls.name} can enter these marks.`);
+  const id = `mk-${term.id}-${cls.id}-${subject.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-s${sequence}`;
+  const existing = all.marks.find((m) => m.id === id);
+  if (existing && existing.enteredBy !== user.id && user.role === 'teacher') {
+    const by = all.users.find((u) => u.id === existing.enteredBy)?.name || 'another teacher';
+    throw new Forbidden(`These marks were entered by ${by}. Only they can change them.`);
+  }
   const enrolled = new Set(all.students.filter((s) => s.enrollments?.[term.sessionId] === cls.id).map((s) => s.id));
   const marks = {};
-  for (const [id, m] of Object.entries(v.marks || {})) {
-    if (!enrolled.has(id) || m === '' || m === null || m === undefined) continue;
+  for (const [sid, m] of Object.entries(v.marks || {})) {
+    if (!enrolled.has(sid) || m === '' || m === null || m === undefined) continue;
     const n = Number(m);
     if (!(n >= 0 && n <= 20)) throw new Invalid('Marks must be between 0 and 20.');
-    marks[id] = Math.round(n * 100) / 100;
+    marks[sid] = Math.round(n * 100) / 100;
   }
-  const sheet = { id: `mk-${term.id}-${cls.id}-${subject.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, classId: cls.id, termId: term.id, sessionId: term.sessionId, subject: subject.name, marks, enteredBy: user.id, updatedAt: now };
+  // The teacher who first entered the sheet stays its owner, even after a correction by the proprietor.
+  const sheet = { id, classId: cls.id, termId: term.id, sessionId: term.sessionId, subject: subject.name, sequence, marks, enteredBy: existing?.enteredBy || user.id, updatedBy: user.id, updatedAt: now };
   await putRecord('marks', sheet);
+  if (existing && existing.enteredBy !== user.id) {
+    await putRecord('activityLog', { id: newId('lg'), userId: user.id, action: 'Corrected marks', details: `${subject.name} · ${cls.name} · sequence ${sequence}`, at: now });
+  }
   all.marks = [...all.marks.filter((m) => m.id !== sheet.id), sheet];
   await recomputeResults(all, cls, term, putRecord);
 }
@@ -372,12 +387,19 @@ async function recomputeResults(all, cls, term, putRecord) {
   const rows = pupils.map((p) => {
     const old = all.academicRecords.find((r) => r.studentId === p.id && r.termId === term.id);
     const marks = { ...(old?.marks || {}) };
-    // A subject's sheet is the truth for that subject: a mark cleared there is cleared here.
-    for (const sh of sheets) {
-      if (sh.marks?.[p.id] !== undefined) marks[sh.subject] = sh.marks[p.id];
-      else delete marks[sh.subject];
+    const seqMarks = {};
+    // A subject's sheets are the truth for that subject: its term mark is the average of its sequences.
+    for (const subj of new Set(sheets.map((sh) => sh.subject))) {
+      const ofSubject = sheets.filter((sh) => sh.subject === subj);
+      const bySeq = ofSubject.filter((sh) => sh.sequence && sh.marks?.[p.id] !== undefined);
+      const plain = ofSubject.find((sh) => !sh.sequence && sh.marks?.[p.id] !== undefined); // entered before sequences existed
+      if (bySeq.length) {
+        seqMarks[subj] = Object.fromEntries(bySeq.map((sh) => [sh.sequence, sh.marks[p.id]]));
+        marks[subj] = Math.round((bySeq.reduce((t, sh) => t + sh.marks[p.id], 0) / bySeq.length) * 100) / 100;
+      } else if (plain) marks[subj] = plain.marks[p.id];
+      else delete marks[subj];
     }
-    return { p, old, marks, avg: weightedAverage(marks, subjects) };
+    return { p, old, marks, seqMarks, avg: weightedAverage(marks, subjects) };
   }).filter((r) => r.old || r.avg !== null);
   const ranked = rows.filter((r) => r.avg !== null).sort((a, b) => b.avg - a.avg);
   const avgs = ranked.map((r) => r.avg);
@@ -389,7 +411,7 @@ async function recomputeResults(all, cls, term, putRecord) {
     const rec = {
       conduct: 'Good', attendance: null, daysOpen: null, ...(r.old || {}),
       id: `ar-${term.id}-${r.p.id}`, studentId: r.p.id, sessionId: term.sessionId, termId: term.id, classId: cls.id,
-      marks: r.marks, subjects, average: r.avg, position, outOf: ranked.length, classAverage, highest: avgs[0] ?? null, lowest: avgs.at(-1) ?? null,
+      marks: r.marks, seqMarks: r.seqMarks, sequences: termSequences(all.sessions, term.id), subjects, average: r.avg, position, outOf: ranked.length, classAverage, highest: avgs[0] ?? null, lowest: avgs.at(-1) ?? null,
     };
     if (!rec.remarkCustom && r.avg !== null) rec.remark = autoRemark(r.avg);
     if (JSON.stringify(rec) === JSON.stringify(r.old)) continue;

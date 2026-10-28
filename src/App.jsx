@@ -41,6 +41,7 @@ import Attendance from './pages/Attendance';
 import Expenses from './pages/Expenses';
 import Timetable from './pages/Timetable';
 import TeacherHome from './pages/TeacherHome';
+import ClassSubjects from './pages/ClassSubjects';
 
 function Guard({ perm, children }) {
   const { user } = useStore();
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="academics" element={g('academics.edit', <Academics />)} />
         <Route path="attendance" element={g(['myclass', 'students.edit'], <Attendance />)} />
         <Route path="expenses" element={g('payroll', <Expenses />)} />
+        <Route path="subjects" element={g('students.edit', <ClassSubjects />)} />
         <Route path="timetable" element={g(['myclass', 'academics.edit', 'students.edit'], <Timetable />)} />
         <Route path="promotion" element={g('promotion', <Promotion />)} />
         <Route path="fees" element={g('fees.view', <Fees />)} />
@@ -85,7 +87,6 @@ export default function App() {
         <Route path="fees/structure" element={g('fees.setup', <FeeStructure />)} />
         <Route path="staff" element={g('staff.view', <Staff />)} />
         <Route path="payroll" element={g('payroll', <Payroll />)} />
-        <Route path="inventory" element={g('inventory', <Inventory />)} />
         <Route path="reports" element={g(['reports.financial', 'reports.academic'], <Reports />)} />
         <Route path="announcements" element={<Announcements />} />
         <Route path="users" element={g('users', <Users />)} />

@@ -12,7 +12,6 @@ const REPORTS = [
   { id: 'termly', label: 'Termly collection by class', icon: Receipt, group: 'financial' },
   { id: 'debtors', label: 'Debtors list', icon: ShieldAlert, group: 'financial' },
   { id: 'salary', label: 'Salary report', icon: Wallet, group: 'financial' },
-  { id: 'uniform', label: 'Uniform & materials sales', icon: Package, group: 'financial' },
   { id: 'enrolment', label: 'Enrolment per class', icon: BarChart3, group: 'academic' },
   { id: 'gender', label: 'Gender distribution', icon: Venus, group: 'academic' },
   { id: 'classlist', label: 'Student list per class', icon: Users, group: 'academic' },

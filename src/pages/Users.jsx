@@ -13,7 +13,7 @@ const ACCESS = {
   admin: 'Admissions, students, parents, classes, promotion, term results, staff records, announcements, academic reports.',
   bursar: 'Fee collection & structure, debtors, payroll, uniforms & materials, financial and academic reports.',
   teacher: 'Own class list, pupil profiles, term results and promotion recommendations.',
-  parent: 'Own children only: profile, class, fees, receipts, purchases, announcements and calendar.',
+  parent: 'Own children only: profile, class, fees, receipts, results, attendance, announcements and calendar.',
 };
 
 export default function Users() {

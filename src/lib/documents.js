@@ -1,4 +1,4 @@
-import { allTerms, allocate, billLines, feeStatus, termById } from './finance';
+import { allTerms, allocate, billLines, feeStatus, staffPay, termById } from './finance';
 import { payslipPDF, receiptPDF, reportCardsPDF, timetablePDF } from './exporters';
 import { DAYS } from './timetable';
 import { classSubjects } from './subjects';
@@ -36,7 +36,7 @@ export function downloadPayslip(db, run, item) {
   payslipPDF({
     school: db.school,
     staff,
-    grade: db.salaryScales.find((g) => g.id === staff.gradeId),
+    grade: staffPay(db, staff),
     item: { ...item, methodLabel: methodLabel(item.method) },
     month: monthLabel(run.month),
   });

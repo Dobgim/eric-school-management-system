@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { currentTerm, feeStatus } from '../lib/finance';
+import { currentTerm, feeStatus, yearStatus } from '../lib/finance';
 import { exportExcel, exportTablePDF } from '../lib/exporters';
 import { fullName, money, sum } from '../lib/utils';
 import { Card, DataTable, Empty, ExportButtons, Field, Input, PageHeader, SearchInput, Select, StatCard } from '../components/ui';
@@ -18,8 +18,9 @@ export default function Debtors() {
     .filter((s) => (f.scope === 'active' ? s.status === 'active' : s.status !== 'active'))
     .map((s) => {
       const st = feeStatus(db, s, term.id);
+      const y = yearStatus(db, s);
       const g = db.guardians.find((x) => x.id === s.guardianIds[0]);
-      return { ...s, ...st, name: fullName(s), className: db.classes.find((c) => c.id === s.classId)?.name || '', guardian: g?.name || '', phone: g?.phone || '' };
+      return { ...s, ...st, yearBilled: y.billed, yearPaid: y.paid, yearLeft: y.totalLeft, name: fullName(s), className: db.classes.find((c) => c.id === s.classId)?.name || '', guardian: g?.name || '', phone: g?.phone || '' };
     })
     .filter((s) => s.totalDue > 0), [db, term.id, f.scope]);
 
@@ -44,7 +45,10 @@ export default function Debtors() {
     { key: 'paid', label: 'Paid', align: 'right', format: (v) => money(v, '') },
     { key: 'balance', label: 'Term balance', align: 'right', format: (v) => money(v, '') },
     { key: 'arrears', label: 'Arrears', align: 'right', format: (v) => money(v, '') },
-    { key: 'totalDue', label: 'Total owing', align: 'right', format: (v) => money(v, '') },
+    { key: 'totalDue', label: 'Due now', align: 'right', format: (v) => money(v, '') },
+    { key: 'yearBilled', label: 'Year fees', align: 'right', format: (v) => money(v, '') },
+    { key: 'yearPaid', label: 'Paid this year', align: 'right', format: (v) => money(v, '') },
+    { key: 'yearLeft', label: 'Left for the year', align: 'right', format: (v) => money(v, '') },
   ];
   const summary = [['Debtors', String(rows.length)], ['Term balances', money(totals.balance, cur)], ['Arrears', money(totals.arrears, cur)], ['Total owing', money(totals.due, cur)]];
 
@@ -90,7 +94,8 @@ export default function Debtors() {
             { key: 'progress', label: 'Term paid', render: (s) => <div className="w-28"><Progress value={s.paid} max={s.billed} tone={s.paid ? 'bg-amber-500' : 'bg-rose-500'} /><p className="mt-1 text-xs text-slate-500">{money(s.paid, '')} / {money(s.billed, '')}</p></div> },
             { key: 'balance', label: 'Term balance', align: 'right', render: (s) => money(s.balance, '') },
             { key: 'arrears', label: 'Arrears', align: 'right', render: (s) => (s.arrears ? <span className="text-rose-600">{money(s.arrears, '')}</span> : '—') },
-            { key: 'totalDue', label: 'Total owing', align: 'right', render: (s) => <span className="font-bold text-rose-600">{money(s.totalDue, '')}</span> },
+            { key: 'totalDue', label: 'Due now', align: 'right', render: (s) => <span className="font-bold text-rose-600">{money(s.totalDue, '')}</span> },
+            { key: 'yearLeft', label: 'Whole year', align: 'right', render: (s) => <div className="text-xs whitespace-nowrap"><p>Paid <b className="text-emerald-700">{money(s.yearPaid, '')}</b> of {money(s.yearBilled, '')}</p><p>Left <b className="text-rose-600">{money(s.yearLeft, '')}</b></p></div> },
             { key: 'a', label: '', align: 'right', render: (s) => s.phone && <a href={whatsapp(s)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"><MessageCircle className="size-3.5" />Remind</a> },
           ]}
         />
