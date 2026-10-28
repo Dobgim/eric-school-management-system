@@ -35,7 +35,7 @@ export async function loadAll(q) {
 
 const teacherClassId = (all, user) => all.classes.find((c) => c.teacherId && c.teacherId === user.staffId)?.id || null;
 const parentChildIds = (all, user) => all.students.filter((s) => (s.guardianIds || []).includes(user.guardianId)).map((s) => s.id);
-const forUser = (n, user) => (n.userIds || []).includes(user.id) || (n.roles || []).includes(user.role);
+const forUser = (n, user) => n.by !== user.id && ((n.userIds || []).includes(user.id) || (n.roles || []).includes(user.role));
 const minimalUsers = (all) => all.users.filter((u) => u.status === 'active').map((u) => ({ id: u.id, name: u.name, role: u.role }));
 const staffCard = (s) => ({ id: s.id, firstName: s.firstName, lastName: s.lastName, gender: s.gender, phone: s.phone, position: s.position, classId: s.classId, category: s.category, status: s.status, staffNo: s.staffNo, teaching: s.teaching || [] });
 // Who teaches what, for every signed-in user: names, classes and subjects only, no contact details.
@@ -66,7 +66,7 @@ export function viewFor(user, all) {
       academicRecords: all.academicRecords.filter((r) => kids.has(r.studentId)),
       paymentRequests: all.paymentRequests.filter((r) => r.guardianId === user.guardianId),
       admissionApplications: all.admissionApplications.filter((a) => a.guardianId && a.guardianId === user.guardianId),
-      announcements: all.announcements.filter((a) => a.audience === 'all' || a.audience === 'parents'),
+      announcements: all.announcements.filter((a) => a.audience === 'all' || a.audience === 'parents' || (a.audience === 'personal' && (a.guardianIds || []).includes(user.guardianId))),
       staff: teacherDirectory(all, (s) => teacherIds.has(s.id)),
       users: minimalUsers(all),
     };
@@ -233,6 +233,7 @@ export async function applyOps(q, user, ops) {
       throw new Forbidden('Not allowed.');
     }
 
+    if (c === 'announcements' && t === 'put') { await writeAnnouncement(all, user, before, after, putRecord, now); continue; }
     if (t === 'put') await putRecord(c, after);
     else if (t === 'del') { await q('delete from records where collection = $1 and id = $2', [c, id]); changed.add(c); }
     else throw new Invalid(`Unknown operation ${t}`);
@@ -270,6 +271,30 @@ async function addApplication(q, user, all, v, putRecord, now) {
     title: `Admission application: ${firstName} ${lastName} for ${cls.name}`,
     body: `From ${user.name} · ${app.ref}`,
   });
+}
+
+const STAFF_ROLES = ['superadmin', 'admin', 'bursar', 'teacher', 'staff'];
+
+/**
+ * Save an announcement and, when it is new, notify the people it is for (in the app and on their phones).
+ * Audiences: all, parents, staff, or personal (chosen families only).
+ */
+async function writeAnnouncement(all, user, before, after, putRecord, now) {
+  if (!['all', 'parents', 'staff', 'personal'].includes(after.audience)) throw new Invalid('Choose who the announcement is for.');
+  if (!String(after.title || '').trim() || !String(after.body || '').trim()) throw new Invalid('Write a title and a message.');
+  const guardianIds = after.audience === 'personal' ? [...new Set(after.guardianIds || [])].filter((id) => all.guardians.some((g) => g.id === id)) : [];
+  if (after.audience === 'personal' && !guardianIds.length) throw new Invalid('Choose the parent(s) this message is for.');
+  const a = { ...after, guardianIds, by: before?.by || user.id };
+  await putRecord('announcements', a);
+  if (before) return;
+  const note = { kind: 'announcement', readBy: [], createdAt: now, by: user.id, title: a.title, body: String(a.body).slice(0, 180) };
+  if (a.audience === 'personal') {
+    const userIds = all.users.filter((u) => u.role === 'parent' && u.status === 'active' && guardianIds.includes(u.guardianId)).map((u) => u.id);
+    if (userIds.length) await putRecord('notifications', { ...note, id: newId('nt'), userIds, roles: [], link: '/portal/news', title: `Message from the school: ${a.title}` });
+    return;
+  }
+  if (a.audience !== 'staff') await putRecord('notifications', { ...note, id: newId('nt'), userIds: [], roles: ['parent'], link: '/portal/news' });
+  if (a.audience !== 'parents') await putRecord('notifications', { ...note, id: newId('nt'), userIds: [], roles: STAFF_ROLES, link: '/announcements' });
 }
 
 async function writeUser(q, user, all, op) {

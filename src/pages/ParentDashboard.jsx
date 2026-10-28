@@ -10,11 +10,14 @@ import { visibleAnnouncements } from './Announcements';
 import { myChildren } from './Portal';
 import { InstallCard } from '../components/InstallApp';
 import OutboxNotice from '../components/Outbox';
+import { PushCard } from '../components/NotificationBell';
 
 export const REQUEST_STATUS = {
   pending: ['amber', 'Awaiting verification'],
   approved: ['green', 'Confirmed'],
   rejected: ['red', 'Rejected'],
+  processing: ['blue', 'Waiting for phone approval'],
+  failed: ['red', 'Not completed'],
 };
 
 export default function ParentDashboard() {
@@ -40,6 +43,7 @@ export default function ParentDashboard() {
     <>
       <PageHeader title={`Welcome, ${user.name}`} subtitle={`${term.label} · ${db.school.name}`} />
       <OutboxNotice />
+      <PushCard />
       <InstallCard schoolName={db.school.shortName || db.school.name} />
 
       {owing - pending > 0 && (

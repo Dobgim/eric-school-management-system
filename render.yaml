@@ -16,5 +16,7 @@ services:
         generateValue: true
       - key: ADMIN_PASSWORD
         sync: false
-      - key: MOMO_MODE
-        value: demo
+      - key: FAPSHI_API_USER
+        sync: false # optional: or enter the keys in the app (School Profile -> Settings)
+      - key: FAPSHI_API_KEY
+        sync: false

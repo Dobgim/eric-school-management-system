@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { uid } from './utils';
+import { disablePush } from './push';
 
 // Client side of the data layer. The server (server/index.js) owns the data: this store loads the slice the
 // signed-in user may see, applies changes optimistically, sends them to the API, and reloads whenever another
@@ -352,6 +353,7 @@ export function StoreProvider({ children }) {
   }, [enter]);
 
   const logout = useCallback(async () => {
+    await disablePush();
     try { await request('/api/auth/logout', { method: 'POST' }); } catch { /* offline: still clear locally */ }
     clearCache();
     userRef.current = null;

@@ -152,25 +152,53 @@ Codes that are used, expired, cancelled or made up are refused, by the page and 
 | Salary scales, monthly payroll (advances, deductions, bonuses, CNPS), PDF payslips | Staff, Payroll |
 | Uniforms, books and materials: stock, sales to pupils, low-stock alerts, valuation | Uniforms & Materials |
 | Dashboard and 9 reports exportable to PDF and Excel | Dashboard, Reports |
-| Parent dashboard, online fee payment, receipts and statement, news | Parent portal |
+| Parent dashboard, Mobile Money payment by term or whole year (Fapshi), receipts and statement, news | Parent portal |
 | Parent sign-up; parents registering several children at once; office admits or declines | Register children, Admission applications |
 | Staff accounts by one-time invitation only; staff payslips | Users & Activity → Staff invitations, My Payslips |
-| Live notifications on every signed-in device | Bell in the header |
+| Notifications with unread count, phone push notifications, personal messages to chosen parents | Bell in the header, Announcements |
+| Who has finished paying and who still owes, per term or year, PDF/Excel | Fees completed, Fees not completed |
 | Fee schedule: what every class pays per term, for new and returning pupils (PDF/Excel), visible to everyone | School fees |
 | Who teaches what, by teacher and by class, for parents and staff; subjects are set on each staff record | Teachers & subjects |
 
 ## Parent payments
 
-1. **Pay now (MoMo phone prompt):** the server asks the operator to collect the money. When it's approved, the server records the payment, issues the receipt and alerts the bursar.
-2. **"I've already paid":** the parent pays the school's MoMo number or bank account, then submits the transaction ID. The bursar is alerted, checks it against the school's statement, and confirms or rejects it. The parent is told the outcome.
+The parent first chooses **which term they are paying for**: first, second or third term, or **the whole year**. Each child's fees, what has been paid and what is left for that choice are shown, and the amount is filled in. A parent can pay part of it, but not more than is owed.
 
-A transaction ID can't be used twice. Each payment clears the pupil's oldest unpaid term first.
+1. **Pay now (Mobile Money phone prompt, through [Fapshi](https://fapshi.com)):**
+   - the parent only checks the amount and their MTN or Orange number;
+   - Fapshi sends the approval request to their phone, showing the name of the school's Fapshi service;
+   - once they enter their PIN, the server records the payment against the chosen term(s), issues the receipts, and notifies the bursar and the parent.
 
-**MoMo runs in demo mode (`MOMO_MODE=demo`).** No money moves, and a number ending in `000` simulates a declined payment. To go live:
+   The school's account details are never shown to parents or kept in the browser.
+2. **"I've already paid":** for a parent who paid by USSD or at the bank. They submit the transaction ID and the bursar confirms or rejects it. A transaction ID can't be used twice.
 
-1. Open a merchant account with a provider (Campay, Notch Pay, Monetbil, or MTN / Orange directly).
-2. Implement `liveCollect()` in [server/momo.js](server/momo.js), with the API keys in `.env`.
-3. Set `MOMO_MODE=live`.
+### Connecting the school's Fapshi account
+
+Without keys, payments run in **demo mode**: no money moves, the request is approved automatically after a few seconds, and a number ending in `000` simulates a declined payment. To take real payments:
+
+1. Open a Fapshi account for the school. Ask Fapshi to enable **direct pay** on the live service. The service name you choose there is what parents see on their phone.
+2. Sign in as the super admin and open **School Profile → Settings → Mobile Money collection**. Paste the API user and API key, then choose *Live* (or *Sandbox* to test). The keys are checked with Fapshi and stored **encrypted** (AES-256-GCM) on the server. They are never shown again.
+
+   Alternatively, set `FAPSHI_API_USER`, `FAPSHI_API_KEY` and `FAPSHI_MODE` in the hosting settings.
+3. In the Fapshi dashboard, set the webhook URL to `https://<your-site>/api/payments/fapshi/webhook`. Payments are then confirmed even if the parent closes the app. Every webhook is re-checked with Fapshi before anything is recorded.
+
+The encryption key comes from `SIS_ENCRYPTION_KEY`, or from `JWT_SECRET` when that isn't set. Changing it means entering the Fapshi keys again.
+
+### Who has finished paying
+
+**Fees completed** and **Fees not completed** (Finance menu, for the bursar, secretary and proprietor) list every pupil with the fees, what was paid and what is left. You can view them for any term or for the whole year, and filter by class.
+
+A pupil moves to *Completed* automatically as soon as a payment covers their fees, whether it was made at the bursary or from a parent's phone. Each list downloads as a PDF or Excel file, and pupils who still owe have a WhatsApp reminder link.
+
+## Announcements and phone notifications
+
+- **General announcements** (everyone, all parents, or staff) notify everyone they are for.
+- **Personal messages** go only to the parents chosen. Other parents can't see them.
+- Notifications appear on the bell in the top-right corner with the number of unread messages, and on the installed app's icon.
+- **On the phone:** a parent (or staff member) taps *Turn on* on their home screen or in the bell. School messages, receipts and payment results then arrive as phone notifications, like a WhatsApp message, even when the app is closed.
+- This uses Web Push, so it works on Android and on computers. On iPhone it needs iOS 16.4 or later, with the app added to the Home Screen first.
+- Push keys are created automatically and stored encrypted. You can also set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`.
+- Signing out stops the alerts on that phone.
 
 ## Live updates
 

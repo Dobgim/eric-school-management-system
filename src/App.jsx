@@ -35,6 +35,7 @@ import Admissions from './pages/Admissions';
 import ForgotPassword from './pages/ForgotPassword';
 import SchoolFees from './pages/SchoolFees';
 import Teachers from './pages/Teachers';
+import FeeStatus from './pages/FeeStatus';
 
 function Guard({ perm, children }) {
   const { user } = useStore();
@@ -70,6 +71,8 @@ export default function App() {
         <Route path="fees" element={g('fees.view', <Fees />)} />
         <Route path="fees/online" element={g('fees.collect', <PaymentRequests />)} />
         <Route path="fees/debtors" element={g('fees.view', <Debtors />)} />
+        <Route path="fees/completed" element={g(['fees.view', 'students.edit'], <FeeStatus completed key="done" />)} />
+        <Route path="fees/not-completed" element={g(['fees.view', 'students.edit'], <FeeStatus key="open" />)} />
         <Route path="fees/structure" element={g('fees.setup', <FeeStructure />)} />
         <Route path="staff" element={g('staff.view', <Staff />)} />
         <Route path="payroll" element={g('payroll', <Payroll />)} />

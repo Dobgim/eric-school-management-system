@@ -7,6 +7,7 @@ import { allTerms, currentTerm } from '../lib/finance';
 import { fmtDate, readFileAsDataURL, today } from '../lib/utils';
 import { Logo } from '../components/Layout';
 import { Badge, Button, Card, Confirm, DataTable, Field, Info, Input, Modal, PageHeader, Select, StatCard, Tabs, Textarea, useToast } from '../components/ui';
+import PaymentAccount from '../components/PaymentAccount';
 
 export default function SchoolProfile() {
   const { db, user } = useStore();
@@ -358,8 +359,9 @@ function SettingsTab() {
           <Button icon={Save} onClick={() => { api.setSettings({ cnpsRate: Number(cnps) }); api.setSchool({ regPrefix: prefix }); api.log('Updated system settings'); notify('Settings saved.'); }}>Save settings</Button>
         </div>
       </Card>
-      <Card title="Parent payment accounts" className="lg:row-span-2">
-        <p className="mb-4 text-sm text-slate-600">Shown to parents on the Pay Fees page when they pay by USSD or bank transfer and submit the transaction ID.</p>
+      <PaymentAccount />
+      <Card title="Accounts for payments made outside the app" className="lg:row-span-2">
+        <p className="mb-4 text-sm text-slate-600">Only for parents who already paid by USSD or at the bank and then submit the transaction ID (“I’ve already paid”). Parents paying by phone prompt don’t need these.</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="MTN MoMo number"><Input value={momo.mtnNumber} onChange={setMomoField('mtnNumber')} /></Field>
           <Field label="MTN account name"><Input value={momo.mtnName} onChange={setMomoField('mtnName')} /></Field>
@@ -368,9 +370,6 @@ function SettingsTab() {
           <Field label="Bank"><Input value={momo.bankName} onChange={setMomoField('bankName')} /></Field>
           <Field label="Account number"><Input value={momo.bankAccount} onChange={setMomoField('bankAccount')} /></Field>
           <Field label="Account name" className="sm:col-span-2"><Input value={momo.bankAccountName} onChange={setMomoField('bankAccountName')} /></Field>
-        </div>
-        <div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
-          <b>“Pay now” phone prompts run in demo mode</b> — no money moves. To take real MoMo payments, open a merchant account with a payment provider (e.g. Campay, Notch Pay, Monetbil, or MTN/Orange directly) and connect it in <code>server/momo.js</code> and set <code>MOMO_MODE=live</code> on the server.
         </div>
         <Button className="mt-4" icon={Save} onClick={() => { api.setSettings({ momo }); api.log('Updated parent payment accounts'); notify('Payment accounts saved.'); }}>Save accounts</Button>
       </Card>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
-  AlertTriangle, Banknote, BarChart3, BookOpen, BookOpenCheck, Building2, ClipboardList, GraduationCap, LayoutDashboard, LogOut,
+  AlertTriangle, Banknote, CheckCircle2, CircleDashed, BarChart3, BookOpen, BookOpenCheck, Building2, ClipboardList, GraduationCap, LayoutDashboard, LogOut,
   CloudOff, Megaphone, Menu, Smartphone, UserPlus, Package, Receipt, Settings2, ShieldCheck, Users, UserRound, Wallet, X, ArrowUpCircle, Home, Contact,
 } from 'lucide-react';
 import { useStore } from '../lib/store';
@@ -52,6 +52,8 @@ const NAV = [
   { group: 'Finance', items: [
     { to: '/fees', label: 'Fee Collection', icon: Receipt, perm: 'fees.view', end: true },
     { to: '/fees/online', label: 'Parent Payments', icon: Smartphone, perm: 'fees.collect', badge: (db) => db.paymentRequests.filter((r) => r.status === 'pending').length },
+    { to: '/fees/completed', label: 'Fees completed', icon: CheckCircle2, perm: ['fees.view', 'students.edit'] },
+    { to: '/fees/not-completed', label: 'Fees not completed', icon: CircleDashed, perm: ['fees.view', 'students.edit'] },
     { to: '/fees/debtors', label: 'Debtors', icon: AlertTriangle, perm: 'fees.view' },
     { to: '/fees/structure', label: 'Fee Structure', icon: ClipboardList, perm: 'fees.setup' },
     { to: '/payroll', label: 'Payroll', icon: Wallet, perm: 'payroll' },

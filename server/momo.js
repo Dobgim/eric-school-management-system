@@ -1,9 +1,11 @@
-// Mobile Money collection, run on the server so parents can never record a payment themselves.
+// Mobile Money collection through Fapshi (https://fapshi.com), run on the server so parents can never record
+// a payment themselves. The parent only chooses the amount; Fapshi sends the MTN MoMo or Orange Money
+// approval prompt to their phone, showing the name of the school's Fapshi service.
 //
-// MOMO_MODE=demo (default): no money moves. The phone prompt is simulated; numbers ending in 000 are declined.
-// To take real payments, open a merchant account with a Cameroon provider (Campay, Notch Pay, Monetbil, or
-// MTN MoMo / Orange Money directly), put its API keys in server/.env, and implement `liveCollect` below:
-// start the collection, then wait for the provider's webhook/status check to confirm before returning ok.
+// The school's Fapshi keys come from FAPSHI_API_USER / FAPSHI_API_KEY (+ FAPSHI_MODE=live|sandbox) on the server,
+// or are entered once by the super admin under School Profile → Settings, where they are stored encrypted.
+// With no keys, payments run in demo mode: no money moves, and numbers ending in 000 are declined.
+import { getSecret } from './secrets.js';
 
 const MTN = /^(67\d|65[0-4]|68[0-4])\d{6}$/;
 const ORANGE = /^(69\d|65[5-9]|68[5-9])\d{6}$/;
@@ -16,25 +18,70 @@ export function detectOperator(phone) {
   return null;
 }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const BASE = { live: 'https://live.fapshi.com', sandbox: 'https://sandbox.fapshi.com' };
 
-async function demoCollect({ operator, phone }) {
-  await sleep(2500); // time for the parent to "enter their PIN"
-  if (phone.endsWith('000')) return { ok: false, reason: 'The payment was declined on the phone or the balance is insufficient.' };
-  const stamp = new Date().toISOString().replace(/\D/g, '').slice(2, 12);
-  return { ok: true, transactionId: `${operator === 'mtn' ? 'MP' : 'PP'}${stamp}.${Math.floor(1000 + Math.random() * 9000)}` };
+/** The school's payment account: { mode: 'demo' | 'sandbox' | 'live', apiUser?, apiKey?, source }. */
+export async function gateway(q) {
+  if (process.env.FAPSHI_API_USER && process.env.FAPSHI_API_KEY) {
+    return { mode: process.env.FAPSHI_MODE === 'sandbox' ? 'sandbox' : 'live', apiUser: process.env.FAPSHI_API_USER, apiKey: process.env.FAPSHI_API_KEY, source: 'env' };
+  }
+  const saved = await getSecret(q, 'fapshi');
+  if (saved?.apiUser && saved?.apiKey) return { mode: saved.mode === 'sandbox' ? 'sandbox' : 'live', apiUser: saved.apiUser, apiKey: saved.apiKey, source: 'settings' };
+  return { mode: 'demo', source: 'none' };
 }
 
-// eslint-disable-next-line no-unused-vars
-async function liveCollect({ operator, phone, amount, reference }) {
-  throw new Error('Live Mobile Money is not configured. Set MOMO_MODE=demo or implement liveCollect() in server/momo.js.');
+export const momoMode = () => (process.env.FAPSHI_API_USER ? `Fapshi ${process.env.FAPSHI_MODE === 'sandbox' ? 'sandbox' : 'live'}` : 'demo unless Fapshi keys are saved in Settings');
+
+async function fapshi(gw, method, path, body) {
+  let res;
+  try {
+    res = await fetch(BASE[gw.mode] + path, {
+      method,
+      headers: { apiuser: gw.apiUser, apikey: gw.apiKey, 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(20000),
+    });
+  } catch {
+    throw Object.assign(new Error('Could not reach the payment service. Check the connection and try again.'), { status: 502, expose: true });
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.message || `Payment service error (${res.status}).`), { status: res.status === 401 || res.status === 403 ? 502 : 400, expose: true });
+  return data;
 }
 
-export const momoMode = () => (process.env.MOMO_MODE === 'live' ? 'live' : 'demo');
-
-export async function collect({ operator, phone, amount, reference }) {
+/** Ask Fapshi to send the approval prompt to the parent's phone. Returns { transId }. */
+export async function startCollection(gw, { phone, amount, name, externalId, userId, message }) {
   const n = normalizePhone(phone);
-  if (detectOperator(n) !== operator) return { ok: false, reason: `${n} is not a valid ${operator === 'mtn' ? 'MTN' : 'Orange'} Mobile Money number.` };
-  if (!(amount > 0)) return { ok: false, reason: 'Amount must be greater than zero.' };
-  return momoMode() === 'live' ? liveCollect({ operator, phone: n, amount, reference }) : demoCollect({ operator, phone: n });
+  if (!detectOperator(n)) throw Object.assign(new Error(`${n} is not an MTN or Orange Mobile Money number.`), { status: 400, expose: true });
+  if (gw.mode === 'demo') return { transId: `DEMO-${Date.now().toString(36).toUpperCase()}${n.endsWith('000') ? '-X' : ''}` };
+  const data = await fapshi(gw, 'POST', '/direct-pay', {
+    amount: Math.round(amount), phone: n, medium: detectOperator(n) === 'mtn' ? 'mobile money' : 'orange money',
+    name: String(name || '').slice(0, 60), externalId, userId, message: String(message || '').slice(0, 120),
+  });
+  if (!data.transId) throw Object.assign(new Error(data.message || 'The payment could not be started.'), { status: 400, expose: true });
+  return { transId: data.transId };
+}
+
+/**
+ * Where a collection stands: { status: 'pending' | 'successful' | 'failed', reference?, reason? }.
+ * Demo payments are approved about 6 seconds after they start (numbers ending in 000 are declined).
+ */
+export async function collectionStatus(gw, transId, startedAt) {
+  if (gw.mode === 'demo' || String(transId).startsWith('DEMO-')) {
+    if (Date.now() - new Date(startedAt).getTime() < 6000) return { status: 'pending' };
+    if (transId.endsWith('-X')) return { status: 'failed', reason: 'The payment was declined on the phone or the balance is insufficient.' };
+    return { status: 'successful', reference: transId };
+  }
+  const data = await fapshi(gw, 'GET', `/payment-status/${encodeURIComponent(transId)}`);
+  const s = String(data.status || '').toUpperCase();
+  if (s === 'SUCCESSFUL') return { status: 'successful', reference: data.financialTransId || transId, amount: data.amount };
+  if (s === 'FAILED') return { status: 'failed', reason: 'The payment was declined on the phone or the balance is insufficient.' };
+  if (s === 'EXPIRED') return { status: 'failed', reason: 'The payment request expired before it was approved. Try again.' };
+  return { status: 'pending' };
+}
+
+/** Check a set of keys and return the Fapshi service name parents will see on their phone. */
+export async function checkAccount(gw) {
+  const data = await fapshi(gw, 'GET', '/balance');
+  return { service: data.service || '', balance: data.balance, currency: data.currency || 'XAF' };
 }

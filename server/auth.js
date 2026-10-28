@@ -23,7 +23,7 @@ export async function verifyPassword(password, stored) {
 }
 
 // JWT_SECRET should be set in production. Locally a random secret is generated once and kept in .data/.
-function secret() {
+export function secret() {
   if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
   // Hosts without a lasting disk (Vercel): fall back to a value derived from the database credentials so
   // sessions survive restarts. Setting JWT_SECRET is still recommended.

@@ -30,7 +30,7 @@ export default function PaymentRequests() {
     try {
       for (const i of items) created.push(...await recordPayment(db, api, {
       studentId: i.studentId, amount: i.amount, method: approve.request.method, reference: approve.request.reference,
-      date: approve.date, receivedBy: user.id, channel: 'portal', requestId: approve.request.id,
+      date: approve.date, receivedBy: user.id, channel: 'portal', requestId: approve.request.id, scope: approve.request.scope,
         note: `Submitted by ${guardianName(approve.request.guardianId)} via parent portal`,
       }));
     } catch (e) { return notify(e.message); }

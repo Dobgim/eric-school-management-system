@@ -116,3 +116,42 @@ export function allocateToTerms(db, student, amount) {
 /** Amount already submitted by a parent but not yet verified, per pupil. */
 export const pendingFor = (db, studentId) =>
   sum((db.paymentRequests || []).filter((r) => r.status === 'pending').flatMap((r) => r.items).filter((i) => i.studentId === studentId), (i) => i.amount);
+
+/** Terms a parent can pay for: each term of the current session, or 'year' for all of them. */
+export const sessionTerms = (db) => allTerms(db).filter((t) => t.sessionId === db.settings.currentSessionId);
+export const scopeTerms = (db, scope) => (scope === 'year' ? sessionTerms(db) : allTerms(db).filter((t) => t.id === scope));
+export const scopeLabel = (db, scope) => (scope === 'year' ? `Whole year ${currentSession(db)?.name || ''}`.trim() : termById(db, scope)?.label || '');
+
+/** Still to pay for one term, or for the whole year. */
+export const dueForScope = (db, student, scope) =>
+  sum(scopeTerms(db, scope), (t) => Math.max(0, termBill(db, student, t.id) - termPaid(db, student.id, t.id)));
+
+/** Split an amount over the chosen term(s), earliest first; any surplus stays on the last one. */
+export function allocateToScope(db, student, amount, scope) {
+  const terms = scopeTerms(db, scope);
+  if (!terms.length) return allocateToTerms(db, student, amount);
+  const out = [];
+  let left = Math.round(Number(amount) || 0);
+  for (const t of terms) {
+    const due = termBill(db, student, t.id) - termPaid(db, student.id, t.id);
+    if (due <= 0 || left <= 0) continue;
+    const take = Math.min(due, left);
+    out.push({ termId: t.id, sessionId: t.sessionId, amount: take });
+    left -= take;
+  }
+  if (left > 0) {
+    const last = terms[terms.length - 1];
+    const hit = out.find((x) => x.termId === last.id);
+    if (hit) hit.amount += left;
+    else out.push({ termId: last.id, sessionId: last.sessionId, amount: left });
+  }
+  return out;
+}
+
+/** Fee position for a term or the whole year: what was billed, paid and is left, and whether it is complete. */
+export function scopeStatus(db, student, scope) {
+  const terms = scopeTerms(db, scope);
+  const billed = sum(terms, (t) => termBill(db, student, t.id));
+  const paid = sum(terms, (t) => termPaid(db, student.id, t.id));
+  return { billed, paid, left: Math.max(0, billed - paid), complete: billed > 0 && paid >= billed };
+}

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { Bell, BellRing, CheckCheck, CheckCircle2, Clock, Megaphone, Smartphone, X, XCircle } from 'lucide-react';
 import { useStore } from '../lib/store';
+import { enablePush, pushState, setIconBadge, syncPush } from '../lib/push';
 
 const KIND = {
   payment: [Smartphone, 'bg-emerald-50 text-emerald-600'],
@@ -13,7 +14,7 @@ const KIND = {
 };
 
 export const notificationsFor = (db, user) =>
-  (db.notifications || []).filter((n) => n.userIds?.includes(user.id) || n.roles?.includes(user.role));
+  (db.notifications || []).filter((n) => n.by !== user.id && (n.userIds?.includes(user.id) || n.roles?.includes(user.role)));
 
 const ago = (iso) => {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -44,11 +45,15 @@ export default function NotificationBell() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [popup, setPopup] = useState(null);
-  const [perm, setPerm] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'));
+  const [push, setPush] = useState('off');
   const ref = useRef(null);
   const seen = useRef(null);
   const mine = notificationsFor(db, user);
   const unread = mine.filter((n) => !n.readBy.includes(user.id));
+
+  // Phone notifications: re-register this phone with the server, and show the unread count on the app icon.
+  useEffect(() => { syncPush().catch(() => {}); pushState().then(setPush).catch(() => {}); }, []);
+  useEffect(() => { setIconBadge(unread.length); }, [unread.length]);
 
   // Alert on notifications that arrive while the app is open (another tab, or this one).
   const ids = mine.map((n) => n.id).join();
@@ -58,12 +63,6 @@ export default function NotificationBell() {
       if (fresh.length) {
         const n = fresh[0];
         setPopup(n);
-        if (perm === 'granted' && document.visibilityState !== 'visible') {
-          try {
-            const d = new Notification(n.title, { body: n.body, tag: n.id, icon: '/favicon.svg' });
-            d.onclick = () => { window.focus(); open$(n); d.close(); };
-          } catch { /* some browsers only allow notifications from a service worker */ }
-        }
       }
     }
     seen.current = new Set(mine.map((n) => n.id));
@@ -89,10 +88,7 @@ export default function NotificationBell() {
     if (n.link) navigate(n.link);
   }
 
-  const enableDesktop = async () => {
-    if (!('Notification' in window)) return;
-    setPerm(await Notification.requestPermission());
-  };
+  const turnOn = async () => setPush(await enablePush().catch(() => 'off'));
 
   return (
     <div className="relative" ref={ref}>
@@ -107,11 +103,12 @@ export default function NotificationBell() {
             <p className="font-bold text-slate-900">Notifications</p>
             {unread.length > 0 && <button type="button" onClick={() => api.markRead(unread.map((n) => n.id), user.id)} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline"><CheckCheck className="size-3.5" />Mark all read</button>}
           </div>
-          {perm === 'default' && (
-            <button type="button" onClick={enableDesktop} className="flex w-full items-center gap-2 border-b border-slate-100 bg-amber-50 px-4 py-2 text-left text-xs font-semibold text-amber-800 hover:bg-amber-100">
-              <BellRing className="size-3.5" />Turn on desktop alerts so you see payments even when this tab is in the background
+          {push === 'off' && (
+            <button type="button" onClick={turnOn} className="flex w-full items-center gap-2 border-b border-slate-100 bg-amber-50 px-4 py-2 text-left text-xs font-semibold text-amber-800 hover:bg-amber-100">
+              <BellRing className="size-3.5 shrink-0" />Turn on notifications on this phone or computer, so messages arrive even when the app is closed
             </button>
           )}
+          {push === 'denied' && <p className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-600">Notifications are blocked for this site. Allow them in your browser’s site settings to get alerts.</p>}
           <div className="max-h-[60vh] divide-y divide-slate-100 overflow-y-auto">
             {mine.length ? mine.slice(0, 30).map((n) => <Item key={n.id} n={n} unread={!n.readBy.includes(user.id)} onOpen={open$} />) : <p className="px-4 py-10 text-center text-sm text-slate-500">You’re all caught up.</p>}
           </div>
@@ -130,6 +127,20 @@ export default function NotificationBell() {
         </div>,
         document.body,
       )}
+    </div>
+  );
+}
+
+/** Invitation on the parent's home screen to receive school messages like a WhatsApp message. */
+export function PushCard() {
+  const [state, setState] = useState('loading');
+  useEffect(() => { pushState().then(setState).catch(() => setState('unsupported')); }, []);
+  if (state !== 'off') return null;
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3">
+      <BellRing className="size-5 shrink-0 text-brand-700" />
+      <p className="min-w-48 flex-1 text-sm text-brand-900"><b>Get school messages on your phone.</b> Announcements, payment receipts and personal messages arrive like a WhatsApp message, even when the app is closed.</p>
+      <button type="button" onClick={async () => setState(await enablePush().catch(() => 'off'))} className="rounded-md bg-brand-700 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-800">Turn on</button>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 // Service worker: makes the app installable and lets it open without internet.
 // Bump VERSION when this file's caching rules change; new builds are picked up automatically.
-const VERSION = 'v5';
+const VERSION = 'v6';
 const SHELL = `sis-shell-${VERSION}`;
 const ASSETS = `sis-assets-${VERSION}`;
 const FONTS = `sis-fonts-${VERSION}`;
@@ -103,3 +103,30 @@ async function staleWhileRevalidate(request, name) {
   }).catch(() => hit);
   return hit || network;
 }
+
+// Phone notifications sent by the school server (announcements, payments, messages).
+self.addEventListener('push', (event) => {
+  let n = {};
+  try { n = event.data ? event.data.json() : {}; } catch { n = { title: event.data?.text() }; }
+  event.waitUntil((async () => {
+    if (typeof n.badge === 'number' && self.navigator.setAppBadge) {
+      try { await (n.badge ? self.navigator.setAppBadge(n.badge) : self.navigator.clearAppBadge()); } catch { /* not supported */ }
+    }
+    await self.registration.showNotification(n.title || 'School', {
+      body: n.body || '', tag: n.tag, renotify: true, icon: '/icons/icon-192.png', badge: '/icons/icon-192.png',
+      vibrate: [120, 60, 120], data: { url: n.url || '/' },
+    });
+  })());
+});
+
+// Tapping the notification opens the app on the right page (or focuses it if it is already open).
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const win = wins.find((w) => new URL(w.url).origin === self.location.origin);
+    if (win) { await win.focus(); return win.navigate(url).catch(() => {}); }
+    return self.clients.openWindow(url);
+  })());
+});

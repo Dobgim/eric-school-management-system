@@ -48,3 +48,19 @@ alter table users drop constraint if exists users_role_check;
 alter table users add constraint users_role_check check (role in ('superadmin', 'admin', 'bursar', 'teacher', 'staff', 'parent'));
 alter table users drop constraint if exists users_status_check;
 alter table users add constraint users_status_check check (status in ('active', 'pending', 'rejected'));
+
+-- Phone notifications (Web Push): one row per browser/phone that allowed notifications.
+create table if not exists push_subscriptions (
+  endpoint text primary key,
+  user_id text not null,
+  keys jsonb not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists push_subscriptions_user on push_subscriptions (user_id);
+
+-- Server-only secrets (payment provider keys, push keys). Values are encrypted and never sent to the browser.
+create table if not exists secrets (
+  key text primary key,
+  value text not null,
+  updated_at timestamptz not null default now()
+);
