@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { Building2, CheckCircle2, Download, FileUp, Info as InfoIcon, Landmark, Loader2, Smartphone, XCircle } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { dueForScope, pendingFor, scopeLabel, scopeStatus, sessionTerms, termById } from '../lib/finance';
+import { currentSession, dueForScope, pendingFor, scopeLabel, scopeStatus, sessionTerms, termById } from '../lib/finance';
 import { downloadReceipt } from '../lib/documents';
 import { OPERATORS, detectOperator, normalizePhone } from '../lib/momo';
 import { fmtDate, fullName, methodLabel, money, readFileAsDataURL, sum, today, uid } from '../lib/utils';
@@ -38,26 +38,41 @@ export default function PayFees() {
   const items = rows.map((r) => ({ studentId: r.k.id, amount: Math.round(Number(amounts[r.k.id]) || 0) })).filter((i) => i.amount > 0);
   const total = sum(items, (i) => i.amount);
   const tooMuch = rows.find((r) => Math.round(Number(amounts[r.k.id]) || 0) > r.due);
-  const options = [
-    ...terms.map((t) => ({ id: t.id, label: t.name, hint: t.id === db.settings.currentTermId ? 'Current term' : '' })),
-    { id: 'year', label: 'Whole year', hint: `All ${terms.length} terms` },
-  ];
+  // What is left for each choice, across all the parent's children.
+  const leftFor = (sc) => sum(kids, (k) => dueForScope(db, k, sc));
+  const termOptions = terms.map((t) => ({ id: t.id, label: t.name, current: t.id === db.settings.currentTermId, left: leftFor(t.id) }));
+  const fullLeft = leftFor('year');
 
   if (!kids.length) return <><PageHeader title="Pay School Fees" /><Card><Empty title="No children currently enrolled" /></Card></>;
   if (done) return <Done result={done} onAgain={() => { setDone(null); setAmounts(defaults()); }} />;
 
   return (
     <>
-      <PageHeader title="Pay School Fees" subtitle="Choose the term, check the amount, and approve the payment on your phone." />
-      <Card title="1. Which term are you paying for?" className="mb-6">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Term">
-          {options.map((o) => (
-            <button key={o.id} type="button" role="radio" aria-checked={scope === o.id} onClick={() => setScope(o.id)}
-              className={`rounded-lg border-2 px-3 py-2.5 text-left ${scope === o.id ? 'border-brand-700 bg-brand-50' : 'border-slate-200 hover:border-slate-300'}`}>
-              <span className="block text-sm font-semibold text-slate-900">{o.label}</span>
-              <span className="block min-h-4 text-xs text-slate-500">{o.hint}</span>
-            </button>
-          ))}
+      <PageHeader title="Pay School Fees" subtitle="Pay the full fees at once or one term at a time, then approve the payment on your phone." />
+      <Card title="1. What are you paying for?" className="mb-6">
+        <div role="radiogroup" aria-label="What are you paying for?" className="space-y-2">
+          {/* Paying everything at once: the whole year's fees for every child in one payment. */}
+          <button type="button" role="radio" aria-checked={scope === 'year'} onClick={() => setScope('year')}
+            className={`flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border-2 px-4 py-3 text-left ${scope === 'year' ? 'border-accent-500 bg-accent-400/15' : 'border-accent-400/60 bg-accent-400/5 hover:border-accent-500'}`}>
+            <span>
+              <span className="block font-semibold text-slate-900">Pay full fees at once</span>
+              <span className="block text-xs text-slate-600">All {terms.length} terms of {currentSession(db)?.name || 'this school year'} in one payment</span>
+            </span>
+            <span className={`text-right text-sm font-bold tabular-nums ${fullLeft ? 'text-slate-900' : 'text-emerald-700'}`}>{fullLeft ? money(fullLeft, cur) : 'All paid'}</span>
+          </button>
+          <p className="pt-1 text-xs font-semibold tracking-wide text-slate-500 uppercase">Or pay one term</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {termOptions.map((o) => (
+              <button key={o.id} type="button" role="radio" aria-checked={scope === o.id} onClick={() => setScope(o.id)}
+                className={`flex items-center justify-between gap-2 rounded-lg border-2 px-3 py-2.5 text-left ${scope === o.id ? 'border-brand-700 bg-brand-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                <span>
+                  <span className="block text-sm font-semibold text-slate-900">{o.label}</span>
+                  {o.current && <span className="block text-xs text-slate-500">Current term</span>}
+                </span>
+                <span className={`text-xs font-semibold tabular-nums ${o.left ? 'text-slate-700' : 'text-emerald-700'}`}>{o.left ? money(o.left, cur) : 'Paid'}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </Card>
       <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
@@ -277,7 +292,7 @@ function Done({ result, onAgain }) {
         </p>
         {online && (
           <ul className="mt-6 divide-y divide-slate-100 rounded-xl border border-slate-200 text-left">
-            {db.payments.filter((p) => (result.paymentIds || []).includes(p.id)).map((p) => {
+            {db.payments.filter((p) => (result.paymentIds || []).includes(p.id)).sort((a, b) => (termById(db, a.termId)?.start || '').localeCompare(termById(db, b.termId)?.start || '')).map((p) => {
               const k = db.students.find((s) => s.id === p.studentId);
               return (
                 <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">

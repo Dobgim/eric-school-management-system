@@ -120,7 +120,7 @@ export const pendingFor = (db, studentId) =>
 /** Terms a parent can pay for: each term of the current session, or 'year' for all of them. */
 export const sessionTerms = (db) => allTerms(db).filter((t) => t.sessionId === db.settings.currentSessionId);
 export const scopeTerms = (db, scope) => (scope === 'year' ? sessionTerms(db) : allTerms(db).filter((t) => t.id === scope));
-export const scopeLabel = (db, scope) => (scope === 'year' ? `Whole year ${currentSession(db)?.name || ''}`.trim() : termById(db, scope)?.label || '');
+export const scopeLabel = (db, scope) => (scope === 'year' ? `Full fees ${currentSession(db)?.name || ''} (all terms)`.replace('  ', ' ') : termById(db, scope)?.label || '');
 
 /** Still to pay for one term, or for the whole year. */
 export const dueForScope = (db, student, scope) =>

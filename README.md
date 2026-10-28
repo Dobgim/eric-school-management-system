@@ -162,7 +162,7 @@ Codes that are used, expired, cancelled or made up are refused, by the page and 
 
 ## Parent payments
 
-The parent first chooses **which term they are paying for**: first, second or third term, or **the whole year**. Each child's fees, what has been paid and what is left for that choice are shown, and the amount is filled in. A parent can pay part of it, but not more than is owed.
+The parent first chooses **Pay full fees at once** (every term of the school year in one payment) or a single term (first, second or third). Each choice shows the amount still owed. Each child's fees, what has been paid and what is left for that choice are shown, and the amount is filled in. A parent can pay part of it, but not more than is owed.
 
 1. **Pay now (Mobile Money phone prompt, through [Fapshi](https://fapshi.com)):**
    - the parent only checks the amount and their MTN or Orange number;

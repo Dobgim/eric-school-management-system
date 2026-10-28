@@ -82,7 +82,7 @@ export default function FeeStatus({ completed }) {
         <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-3">
           <SearchInput value={q} onChange={setQ} placeholder="Pupil, parent or phone…" />
           <Select value={scope} onChange={(e) => setScope(e.target.value)} aria-label="Term"
-            options={[...terms.map((t) => ({ value: t.id, label: t.label })), { value: 'year', label: `Whole year (${sessionTerms(db).length} terms)` }]} />
+            options={[...terms.map((t) => ({ value: t.id, label: t.label })), { value: 'year', label: `Full fees, whole year (${sessionTerms(db).length} terms)` }]} />
           <Select value={classId} onChange={(e) => setClassId(e.target.value)} placeholder="All classes" aria-label="Class" options={[...db.classes].sort((a, b) => a.order - b.order).map((c) => ({ value: c.id, label: c.name }))} />
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
