@@ -192,7 +192,7 @@ The app needs its **API running** and a **PostgreSQL database**. Hosting only th
 
 1. Import the GitHub repo in Vercel. It detects Vite; keep the defaults.
 2. Add the database:
-   - Go to **Storage → Create Database → Neon (Postgres)** and connect it to the project. This sets `DATABASE_URL` for you.
+   - Go to **Storage → Create Database → Neon (Postgres)** and connect it to the project, with **Custom Prefix `DATABASE`** (so it creates `DATABASE_URL`). `POSTGRES_URL` and `STORAGE_URL` are also accepted. Give the school its own database rather than sharing one with another app.
    - Alternatively, paste a connection string from Neon or Supabase under **Settings → Environment Variables** as `DATABASE_URL`. Prefer the *pooled* connection string.
 3. Under **Settings → Environment Variables**, also add:
    - `JWT_SECRET`: any long random string;

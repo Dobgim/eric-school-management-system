@@ -9,12 +9,16 @@ const here = dirname(fileURLToPath(import.meta.url));
 // Local data lives outside server/ so `node --watch` does not restart on every database write.
 export const DATA_DIR = process.env.SIS_DATA_DIR || join(here, '..', '.data');
 
+// The connection string, under whichever name the host created it (Vercel's Neon integration uses a
+// configurable prefix, e.g. DATABASE_URL, STORAGE_URL or POSTGRES_URL).
+export const databaseUrl = () => process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.STORAGE_URL || '';
+
 let impl;
 
 async function connect() {
-  if (process.env.DATABASE_URL) {
+  if (databaseUrl()) {
     const { default: pg } = await import('pg');
-    const url = process.env.DATABASE_URL;
+    const url = databaseUrl();
     const local = /localhost|127\.0\.0\.1/.test(url);
     // Serverless functions run many small instances: keep each one's pool small (use the provider's pooled URL).
     const pool = new pg.Pool({ connectionString: url, ssl: local || /sslmode=disable/.test(url) ? false : { rejectUnauthorized: false }, max: process.env.VERCEL ? 3 : 10 });
