@@ -1,7 +1,7 @@
 import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarCheck, Clock, Download, GraduationCap, ShoppingBag, Smartphone, Wallet } from 'lucide-react';
 import { useStore } from '../lib/store';
-import { allTerms, billLines, currentTerm, feeStatus, termPaid, termsUpTo } from '../lib/finance';
+import { allTerms, billLines, currentSession, currentTerm, feeStatus, sessionTerms, termBill, termPaid, termsUpTo } from '../lib/finance';
 import { downloadReceipt, downloadReportCards } from '../lib/documents';
 import { age, feeTypeLabel, fmtDate, fullName, methodLabel, money, today } from '../lib/utils';
 import { Avatar, Badge, Button, Card, DataTable, Empty, FeeBadge, Info, PageHeader, Tabs } from '../components/ui';
@@ -98,10 +98,14 @@ function Overview({ child }) {
 
 function Fees({ child }) {
   const { db } = useStore();
-  const terms = termsUpTo(db, db.settings.currentTermId).filter((t) => billLines(db, child, t.id).length).reverse();
+  // Every term of this school year (also those not started yet), plus earlier terms that still have a balance.
+  const yearTerms = sessionTerms(db).filter((t) => billLines(db, child, t.id).length);
+  const earlier = termsUpTo(db, db.settings.currentTermId).filter((t) => t.sessionId !== db.settings.currentSessionId && termBill(db, child, t.id) > termPaid(db, child.id, t.id));
+  const terms = [...earlier, ...yearTerms].reverse();
   const payments = db.payments.filter((p) => p.studentId === child.id).sort((a, b) => b.date.localeCompare(a.date));
   return (
     <div className="grid gap-6 xl:grid-cols-2">
+      <YearAtAGlance child={child} terms={yearTerms} />
       <Card title="Fee breakdown by term">
         <div className="space-y-5">
           {terms.map((t) => {
@@ -134,6 +138,49 @@ function Fees({ child }) {
         />
       </Card>
     </div>
+  );
+}
+
+/** The year's fees divided into terms, with what is paid and left for each, for the parent. */
+function YearAtAGlance({ child, terms }) {
+  const { db } = useStore();
+  const cur = db.school.currency;
+  if (!terms.length) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = terms.map((t) => {
+    const billed = termBill(db, child, t.id);
+    const paid = Math.min(termPaid(db, child.id, t.id), billed);
+    const state = paid >= billed ? ['green', 'Paid'] : paid > 0 ? ['amber', 'Partly paid'] : t.start > today ? ['slate', 'Upcoming'] : ['red', 'Not paid'];
+    return { t, billed, paid, left: Math.max(0, billed - paid), state };
+  });
+  const total = rows.reduce((a, r) => ({ billed: a.billed + r.billed, paid: a.paid + r.paid, left: a.left + r.left }), { billed: 0, paid: 0, left: 0 });
+  return (
+    <Card title={`School year ${currentSession(db)?.name || ''} at a glance`} className="xl:col-span-2" bodyClass=""
+      actions={total.left > 0 && <Link to={`/portal/pay?child=${child.id}`}><Button size="sm" icon={Smartphone}>Pay</Button></Link>}>
+      <div className="overflow-x-auto">
+        <table className="table-base">
+          <thead><tr><th>Term</th><th className="text-right">Fees</th><th className="text-right">Paid</th><th className="text-right">Left to pay</th><th>Status</th></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.t.id}>
+                <td className="font-semibold whitespace-nowrap text-slate-800">{r.t.name}<span className="block text-xs font-normal text-slate-500">{fmtDate(r.t.start)} – {fmtDate(r.t.end)}</span></td>
+                <td className="text-right tabular-nums">{money(r.billed, '')}</td>
+                <td className="text-right text-emerald-700 tabular-nums">{money(r.paid, '')}</td>
+                <td className={`text-right font-semibold tabular-nums ${r.left ? 'text-rose-600' : 'text-emerald-700'}`}>{money(r.left, '')}</td>
+                <td><Badge tone={r.state[0]}>{r.state[1]}</Badge></td>
+              </tr>
+            ))}
+            <tr className="bg-slate-50 font-bold">
+              <td>Whole year</td>
+              <td className="text-right tabular-nums">{money(total.billed, cur)}</td>
+              <td className="text-right text-emerald-700 tabular-nums">{money(total.paid, cur)}</td>
+              <td className={`text-right tabular-nums ${total.left ? 'text-rose-600' : 'text-emerald-700'}`}>{money(total.left, cur)}</td>
+              <td>{total.left ? <Badge tone="amber">{Math.round((total.paid / (total.billed || 1)) * 100)}% paid</Badge> : <Badge tone="green">All paid</Badge>}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </Card>
   );
 }
 

@@ -170,7 +170,7 @@ Everyone can switch between **English** and **Français**. The switch is on the 
 | Daily attendance register (present / absent / late); parents of absent pupils are notified on their phone at once; term summary per pupil; days present filled into report cards | Daily attendance |
 | School spending (rent, electricity, materials…) and money in against money out per month, PDF/Excel | Expenses & cash flow |
 | Full backup of all school data and restore from a backup file (super admin), with a monthly reminder | School Profile → System Settings |
-| Fee structure per class, term and fee type, plus category discounts | Fee Structure |
+| Fee structure per class and fee type: enter the whole year once and it is divided into the terms (equal parts or chosen percentages, registration in the first term), or set each term; category discounts | Fee Structure |
 | Payments by cash, MTN MoMo, Orange Money or bank transfer; PDF receipts | Fee Collection |
 | Outstanding balances and arrears, with a WhatsApp reminder link | Debtors |
 | Salary scales, monthly payroll (advances, deductions, bonuses, CNPS), PDF payslips | Staff, Payroll |
@@ -181,7 +181,7 @@ Everyone can switch between **English** and **Français**. The switch is on the 
 | Staff accounts by one-time invitation only; staff payslips | Users & Activity → Staff invitations, My Payslips |
 | Notifications with unread count, phone push notifications, personal messages to chosen parents | Bell in the header, Announcements |
 | Who has finished paying and who still owes, per term or year, PDF/Excel | Fees completed, Fees not completed |
-| Fee schedule: what every class pays per term, for new and returning pupils (PDF/Excel), visible to everyone | School fees |
+| Fee schedule: what every class pays per term or for the whole year by term, for new and returning pupils, visible to everyone; parents see their child's year at a glance (each term's fees, paid, left) | School fees, My Children → Fees & receipts |
 | Who teaches what, by teacher and by class, for parents and staff; subjects are set on each staff record | Teachers & subjects |
 
 ## Parent payments

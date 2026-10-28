@@ -96,10 +96,21 @@ export const OFFICE = {
   'Earnings': 'Gains', 'Employee': 'Employé', 'NET PAY': 'NET À PAYER', 'Status: PENDING': 'Statut : EN ATTENTE', 'Salary advance': 'Avance sur salaire', 'Other deductions': 'Autres retenues',
   'CNPS (pension)': 'CNPS (retraite)', 'Total deductions': 'Total des retenues', 'Housing': 'Logement', 'Transport': 'Transport', 'Online payment (parent portal)': 'Paiement en ligne (portail parent)',
   'Teachers and Subjects': 'Enseignants et matières', 'Teachers by Class': 'Enseignants par classe', 'Class teacher': 'Titulaire', 'Subject teachers': 'Enseignants de matières', 'Attendance Summary': 'Récapitulatif des présences',
+    'Whole year (divided into terms)': 'Année entière (répartie en trimestres)', 'One term at a time': 'Un trimestre à la fois', 'Save and divide into terms': 'Enregistrer et répartir en trimestres',
+  'How the year’s fees are divided': 'Répartition des frais de l’année', 'Quick choice…': 'Choix rapide…', 'Equal parts': 'Parts égales', 'School year': 'Année scolaire', 'Year total': 'Total annuel',
+  'Per term (returning pupil)': 'Par trimestre (ancien élève)', '(year)': '(année)', 'Fees ticked “new pupils only” (such as registration) are charged in full in the first term.': 'Les frais cochés « nouveaux élèves seulement » (comme l’inscription) sont payés en entier au premier trimestre.',
+  'The term percentages must add up to 100%.': 'Les pourcentages des trimestres doivent faire 100 %.', 'Whole year': 'Année entière', 'Partly paid': 'Payé en partie', 'Not paid': 'Non payé', 'Upcoming': 'À venir',
+  'Set what each class pays. Enter the whole year once and it is divided into the terms, or set each term yourself. Balances update immediately.': 'Fixez ce que paie chaque classe. Saisissez l’année entière une fois et elle est répartie en trimestres, ou réglez chaque trimestre vous-même. Les soldes sont mis à jour aussitôt.',
+    'for each term of the school year.': 'pour chaque trimestre de l’année scolaire.', 'Whole year, by term': 'Année entière, par trimestre', 'Whole year, new pupil': 'Année entière, nouvel élève', 'No fees published for this year yet': 'Aucun frais publié pour cette année', 'The bursar has not set the fee structure yet.': 'L’économe n’a pas encore fixé la grille des frais.',
     'Switch to English': 'Switch to English', 'Passer en français': 'Passer en français', 'Nothing yet.': 'Rien pour le moment.',
 };
 
 export const OFFICE_PATTERNS = [
+  [/^School year (.+) at a glance$/, 'Année scolaire $1 en un coup d’œil'],
+  [/^(\d+)% paid$/, '$1 % payé'],
+  [/^Total (\d+)%$/, 'Total $1 %'],
+  [/^New pupil, first term: (.+)$/, 'Nouvel élève, premier trimestre : $1'],
+  [/^Fees saved for (.+), divided into (\d+) terms\. Parents see each term’s amount\.$/, 'Frais enregistrés pour $1, répartis en $2 trimestres. Les parents voient le montant de chaque trimestre.'],
   [/^Class average: (.+)$/, 'Moyenne de la classe : $1'],
   [/^Highest: (.+)$/, 'Plus forte : $1'],
   [/^Lowest: (.+)$/, 'Plus faible : $1'],

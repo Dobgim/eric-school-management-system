@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../lib/store';
-import { allTerms } from '../lib/finance';
+import { allTerms, sessionTerms } from '../lib/finance';
 import { exportExcel, exportTablePDF } from '../lib/exporters';
 import { FEE_TYPES, money, num } from '../lib/utils';
 import { Badge, Card, Empty, ExportButtons, PageHeader } from '../components/ui';
@@ -54,6 +54,7 @@ export default function SchoolFees() {
             <span>Fees for</span>
             <select className="input w-auto py-1" value={termId} onChange={(e) => setTermId(e.target.value)} aria-label="Term">
               {terms.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+              <option value="year">Whole year, by term</option>
             </select>
           </div>
         }
@@ -64,7 +65,7 @@ export default function SchoolFees() {
           />
         )}
       >
-        {!types.length ? (
+        {termId === 'year' ? <YearTable myClassIds={myClassIds} /> : !types.length ? (
           <Empty title="No fees published for this term yet" message="The bursar has not set the fee structure for this term." />
         ) : (
           <>
@@ -110,10 +111,41 @@ export default function SchoolFees() {
           </>
         )}
         <div className="space-y-1 border-t border-slate-100 px-5 py-4 text-sm text-slate-600">
-          <p>Amounts in {cur} for one term.{newOnly.size > 0 && ` Charged only to pupils joining the school this session: ${types.filter((t) => newOnly.has(t.id)).map((t) => t.label).join(', ')}.`}</p>
+          <p>Amounts in {cur} {termId === 'year' ? 'for each term of the school year.' : 'for one term.'}{termId !== 'year' && newOnly.size > 0 && ` Charged only to pupils joining the school this session: ${types.filter((t) => newOnly.has(t.id)).map((t) => t.label).join(', ')}.`}</p>
           {discounts.length > 0 && <p>Tuition discounts: {discounts.map((c) => `${c.name} ${c.tuitionDiscount}%`).join(' · ')}.</p>}
         </div>
       </Card>
     </>
+  );
+}
+
+/** Each class's fees for every term of the school year, and the year's total. */
+function YearTable({ myClassIds }) {
+  const { db } = useStore();
+  const terms = sessionTerms(db);
+  const classes = [...db.classes].sort((a, b) => a.order - b.order);
+  const sumFor = (classId, termId, isNew) => db.feeItems.filter((f) => f.termId === termId && f.classId === classId && (isNew || f.appliesTo !== 'new')).reduce((t, f) => t + f.amount, 0);
+  const rows = classes.map((c) => {
+    const parts = terms.map((t) => sumFor(c.id, t.id, false));
+    const fresh = terms.reduce((t, x) => t + sumFor(c.id, x.id, true), 0);
+    return { c, parts, year: parts.reduce((t, p) => t + p, 0), fresh };
+  });
+  if (!rows.some((r) => r.year)) return <Empty title="No fees published for this year yet" message="The bursar has not set the fee structure yet." />;
+  return (
+    <div className="overflow-x-auto">
+      <table className="table-base">
+        <thead><tr><th>Class</th>{terms.map((t) => <th key={t.id} className="text-right">{t.name}</th>)}<th className="text-right">Whole year</th><th className="text-right">Whole year, new pupil</th></tr></thead>
+        <tbody>
+          {rows.map(({ c, parts, year, fresh }) => (
+            <tr key={c.id} className={myClassIds.has(c.id) ? 'bg-accent-400/10' : ''}>
+              <td className="font-medium whitespace-nowrap text-slate-800">{c.name} {myClassIds.has(c.id) && <Badge tone="amber" className="ml-1">Your child</Badge>}</td>
+              {parts.map((p, i) => <td key={i} className="text-right tabular-nums">{p ? num(p) : <span className="text-slate-400">—</span>}</td>)}
+              <td className="text-right font-semibold tabular-nums">{year ? num(year) : <span className="font-normal text-slate-400">Not set</span>}</td>
+              <td className="text-right font-semibold tabular-nums">{fresh ? num(fresh) : <span className="font-normal text-slate-400">Not set</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

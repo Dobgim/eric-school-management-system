@@ -3,7 +3,8 @@ import { Copy, Save } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { allTerms } from '../lib/finance';
 import { FEE_TYPES, money } from '../lib/utils';
-import { Button, Card, Field, Input, Modal, PageHeader, Select, useToast } from '../components/ui';
+import { Button, Card, Field, Input, Modal, PageHeader, Select, Tabs, useToast } from '../components/ui';
+import YearFees from '../components/YearFees';
 
 export default function FeeStructure() {
   const { db, api } = useStore();
@@ -16,6 +17,7 @@ export default function FeeStructure() {
   const [newOnly, setNewOnly] = useState({});
   const [copy, setCopy] = useState(null);
   const [cats, setCats] = useState(db.categories);
+  const [mode, setMode] = useState('year');
 
   useEffect(() => {
     const g = {};
@@ -64,8 +66,9 @@ export default function FeeStructure() {
   return (
     <>
       {toast}
-      <PageHeader title="Fee Structure" subtitle="Set what each class pays per term and per fee category. Changes affect balances for that term immediately." />
-      <Card
+      <PageHeader title="Fee Structure" subtitle="Set what each class pays. Enter the whole year once and it is divided into the terms, or set each term yourself. Balances update immediately." />
+      <Tabs tabs={[{ id: 'year', label: 'Whole year (divided into terms)' }, { id: 'term', label: 'One term at a time' }]} value={mode} onChange={setMode} />
+      {mode === 'year' ? <YearFees notify={notify} /> : <Card
         bodyClass=""
         actions={<><Button variant="secondary" icon={Copy} onClick={() => setCopy({ from: terms[Math.max(0, terms.findIndex((t) => t.id === termId) - 1)]?.id, increase: 0 })}>Copy from another term</Button><Button icon={Save} onClick={save}>Save</Button></>}
         title={
@@ -108,7 +111,7 @@ export default function FeeStructure() {
             </tbody>
           </table>
         </div>
-      </Card>
+      </Card>}
 
       <Card title="Pupil fee categories (tuition discounts)" className="mt-6" actions={<Button icon={Save} onClick={() => { api.mutate((d) => { d.categories = cats; return d; }); api.log('Updated fee categories'); notify('Categories saved.'); }}>Save categories</Button>}>
         <div className="grid gap-4 sm:grid-cols-3">
