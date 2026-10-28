@@ -86,7 +86,8 @@ function Promote() {
   };
 
   const options = (p) => Object.entries(ACTIONS)
-    .filter(([k]) => (k === 'promote' ? !!nextClass : k === 'graduate' ? !nextClass : true))
+    // Graduating is possible from any class: the end of a cycle (Class 6, Form 5, 3e…) as well as the last class.
+    .filter(([k]) => (k === 'promote' ? !!nextClass : true))
     .map(([value, label]) => ({ value, label: value === 'promote' ? `Promote → ${nextClass.name}` : label }));
 
   return (

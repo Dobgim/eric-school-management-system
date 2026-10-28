@@ -4,12 +4,13 @@ import { Building2, CalendarDays, Layers, Pencil, Plus, Save, Settings2, Trash2,
 import { useStore } from '../lib/store';
 import { can } from '../lib/permissions';
 import { allTerms, currentTerm } from '../lib/finance';
-import { fmtDate, fmtDateTime, readFileAsDataURL } from '../lib/utils';
+import { fmtDate, fmtDateTime, readFileAsDataURL, uid } from '../lib/utils';
 import { Logo } from '../components/Layout';
 import { Badge, Button, Card, Confirm, DataTable, Field, Info, Input, Modal, PageHeader, Select, StatCard, Tabs, Textarea, useToast } from '../components/ui';
 import PaymentAccount from '../components/PaymentAccount';
 import RestoreBackup from '../components/RestoreBackup';
 import SmsSettings from '../components/SmsSettings';
+import { LEVELS, PRESETS, levelLabel, levelTone } from '../lib/levels';
 
 export default function SchoolProfile() {
   const { db, user } = useStore();
@@ -60,9 +61,9 @@ function ProfileTab({ edit }) {
     <div className="space-y-6">
       {toast}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <StatCard label="Pupils enrolled" value={active.length} hint={`${active.filter((s) => db.classes.find((c) => c.id === s.classId)?.level === 'nursery').length} nursery · ${active.filter((s) => db.classes.find((c) => c.id === s.classId)?.level === 'primary').length} primary`} />
+        <StatCard label="Pupils enrolled" value={active.length} hint={LEVELS.map((l) => [l, active.filter((s) => db.classes.find((c) => c.id === s.classId)?.level === l.id).length]).filter(([, n]) => n).map(([l, n]) => `${n} ${l.label.toLowerCase()}`).join(' · ') || 'none yet'} />
         <StatCard label="Staff strength" value={staff.length} tone="purple" hint={`${staff.filter((s) => s.category === 'teaching').length} teaching · ${staff.filter((s) => s.category !== 'teaching').length} non-teaching`} />
-        <StatCard label="Classes offered" value={db.classes.length} tone="green" hint={`${db.classes.filter((c) => c.level === 'nursery').length} nursery · ${db.classes.filter((c) => c.level === 'primary').length} primary`} />
+        <StatCard label="Classes offered" value={db.classes.length} tone="green" hint={LEVELS.map((l) => [l, db.classes.filter((c) => c.level === l.id).length]).filter(([, n]) => n).map(([l, n]) => `${n} ${l.label.toLowerCase()}`).join(' · ')} />
         <StatCard label="Classrooms" value={db.facilities.filter((f) => f.type === 'Classroom').length} tone="amber" hint={`${db.facilities.length} facilities in total`} />
       </div>
 
@@ -106,8 +107,31 @@ function ClassesTab({ edit }) {
   const { db, api } = useStore();
   const [editing, setEditing] = useState(null);
   const [del, setDel] = useState(null);
+  const [preset, setPreset] = useState(null);
   const [toast, notify] = useToast();
   const teachers = db.staff.filter((s) => s.category === 'teaching' && s.status === 'active');
+
+  // Add a whole level at once (e.g. Form 1 – Upper Sixth), each class with its usual subjects and coefficients.
+  const presetList = preset ? PRESETS[preset.system][preset.level] : [];
+  const picked = preset?.picked ?? presetList.map(([n]) => n).filter((n) => !db.classes.some((c) => c.name.toLowerCase() === n.toLowerCase()));
+  const addPreset = () => {
+    const toAdd = presetList.filter(([n]) => picked.includes(n));
+    const empty = (c) => !db.students.some((s) => s.classId === c.id || Object.values(s.enrollments || {}).includes(c.id));
+    const removing = preset.removeEmpty ? db.classes.filter((c) => c.level !== preset.level && empty(c)) : [];
+    api.mutate((d) => {
+      const ids = new Set(removing.map((c) => c.id));
+      d.classes = d.classes.filter((c) => !ids.has(c.id));
+      d.feeItems = d.feeItems.filter((f) => !ids.has(f.classId));
+      let order = Math.max(-1, ...d.classes.map((x) => x.order));
+      for (const [name, subjects] of toAdd) {
+        d.classes.push({ id: uid('c'), name, level: preset.level, subsystem: preset.system, order: ++order, capacity: preset.level === 'secondary' ? 60 : 40, section: 'A', teacherId: null, facilityId: '', subjects: subjects.map((x) => ({ ...x })) });
+      }
+      return d;
+    });
+    api.log('Added classes', `${toAdd.length} ${preset.level} classes${removing.length ? `; removed ${removing.length} empty classes` : ''}`);
+    notify(`${toAdd.length} class${toAdd.length === 1 ? '' : 'es'} added with their subjects.${removing.length ? ` ${removing.length} empty class${removing.length === 1 ? '' : 'es'} removed.` : ''}`);
+    setPreset(null);
+  };
   const rows = [...db.classes].sort((a, b) => a.order - b.order).map((c) => {
     const pupils = db.students.filter((s) => s.status === 'active' && s.classId === c.id);
     return { ...c, pupils: pupils.length, boys: pupils.filter((p) => p.gender === 'M').length };
@@ -129,13 +153,16 @@ function ClassesTab({ edit }) {
   };
 
   return (
-    <Card title="Nursery & primary classes" bodyClass="" actions={edit && <Button icon={Plus} onClick={() => setEditing({ name: '', level: 'primary', capacity: 40, facilityId: '', teacherId: '', section: 'A' })}>Add class</Button>}>
+    <Card title="Classes" bodyClass="" actions={edit && <>
+      <Button variant="secondary" icon={Layers} onClick={() => setPreset({ level: 'secondary', system: 'en', picked: null, removeEmpty: false })}>Add classes for a level</Button>
+      <Button icon={Plus} onClick={() => setEditing({ name: '', level: 'primary', capacity: 40, facilityId: '', teacherId: '', section: 'A' })}>Add class</Button>
+    </>}>
       {toast}
       <DataTable
         rows={rows}
         columns={[
           { key: 'name', label: 'Class', render: (c) => <span className="font-semibold text-slate-800">{c.name}</span> },
-          { key: 'level', label: 'Level', render: (c) => <Badge tone={c.level === 'nursery' ? 'purple' : 'blue'}>{c.level === 'nursery' ? 'Nursery' : 'Primary'}</Badge> },
+          { key: 'level', label: 'Level', render: (c) => <Badge tone={levelTone(c.level)}>{levelLabel(c.level)}</Badge> },
           { key: 'teacher', label: 'Class teacher', render: (c) => { const t = db.staff.find((s) => s.id === c.teacherId); return t ? `${t.firstName} ${t.lastName}` : <span className="text-slate-400">Unassigned</span>; } },
           { key: 'room', label: 'Classroom', render: (c) => db.facilities.find((f) => f.id === c.facilityId)?.name || '—' },
           { key: 'pupils', label: 'Pupils', align: 'right', render: (c) => <span className={c.pupils > c.capacity ? 'font-bold text-rose-600' : ''}>{c.pupils} / {c.capacity}</span> },
@@ -152,11 +179,39 @@ function ClassesTab({ edit }) {
         {editing && (
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Class name"><Input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} placeholder="e.g. Class 4" /></Field>
-            <Field label="Level"><Select value={editing.level} onChange={(e) => setEditing({ ...editing, level: e.target.value })} options={[{ value: 'nursery', label: 'Nursery' }, { value: 'primary', label: 'Primary' }]} /></Field>
+            <Field label="Level"><Select value={editing.level} onChange={(e) => setEditing({ ...editing, level: e.target.value })} options={LEVELS.map((l) => ({ value: l.id, label: l.label }))} /></Field>
             <Field label="Capacity"><Input type="number" min="1" value={editing.capacity} onChange={(e) => setEditing({ ...editing, capacity: Number(e.target.value) })} /></Field>
             <Field label="Section / Stream"><Input value={editing.section} onChange={(e) => setEditing({ ...editing, section: e.target.value })} /></Field>
             <Field label="Class teacher"><Select value={editing.teacherId || ''} onChange={(e) => setEditing({ ...editing, teacherId: e.target.value || null })} placeholder="— Unassigned —" options={teachers.map((t) => ({ value: t.id, label: `${t.firstName} ${t.lastName}` }))} /></Field>
             <Field label="Classroom"><Select value={editing.facilityId || ''} onChange={(e) => setEditing({ ...editing, facilityId: e.target.value })} placeholder="— None —" options={db.facilities.filter((f) => f.type === 'Classroom').map((f) => ({ value: f.id, label: f.name }))} /></Field>
+          </div>
+        )}
+      </Modal>
+      <Modal open={!!preset} onClose={() => setPreset(null)} title="Add classes for a level" size="lg" footer={<><Button variant="secondary" onClick={() => setPreset(null)}>Cancel</Button><Button icon={Plus} disabled={!picked.length} onClick={addPreset}>Add {picked.length} class{picked.length === 1 ? '' : 'es'}</Button></>}>
+        {preset && (
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Level"><Select value={preset.level} onChange={(e) => setPreset({ ...preset, level: e.target.value, picked: null })} options={LEVELS.map((l) => ({ value: l.id, label: l.label }))} /></Field>
+              <Field label="Sub-system"><Select value={preset.system} onChange={(e) => setPreset({ ...preset, system: e.target.value, picked: null })} options={[{ value: 'en', label: 'English-speaking (Anglophone)' }, { value: 'fr', label: 'French-speaking (Francophone)' }]} /></Field>
+            </div>
+            <div>
+              <p className="label">Classes to add</p>
+              <div className="flex flex-wrap gap-2">
+                {presetList.map(([name]) => {
+                  const exists = db.classes.some((c) => c.name.toLowerCase() === name.toLowerCase());
+                  const on = picked.includes(name);
+                  return <button key={name} type="button" aria-pressed={on} disabled={exists} onClick={() => setPreset({ ...preset, picked: on ? picked.filter((n) => n !== name) : [...picked, name] })}
+                    className={`rounded-md border px-3 py-1.5 text-sm font-semibold ${exists ? 'border-slate-200 bg-slate-50 text-slate-400' : on ? 'border-brand-700 bg-brand-700 text-white' : 'border-slate-300 bg-white text-slate-700'}`}>{name}{exists ? ' ✓' : ''}</button>;
+                })}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">Each class comes with its usual subjects and coefficients ({presetList[0]?.[1].slice(0, 4).map((x) => x.name).join(', ')}…). Adjust them later under Academics → Subjects by class.</p>
+            </div>
+            {db.classes.some((c) => c.level !== preset.level) && (
+              <label className="flex items-start gap-2 text-sm text-slate-700">
+                <input type="checkbox" className="mt-0.5 size-4 accent-brand-700" checked={preset.removeEmpty} onChange={(e) => setPreset({ ...preset, removeEmpty: e.target.checked })} />
+                <span>Also remove the classes of other levels that have no pupils (for example, a secondary school that has no nursery or primary section).</span>
+              </label>
+            )}
           </div>
         )}
       </Modal>

@@ -1,9 +1,9 @@
-// Subjects of the Cameroon nursery and primary curricula, offered as suggestions in the staff form.
-export const SUBJECTS = [
-  'English Language', 'French', 'Mathematics', 'Science and Technology', 'Social Studies', 'History', 'Geography',
-  'Citizenship', 'National Languages and Cultures', 'ICT', 'Physical Education', 'Arts and Crafts', 'Music',
-  'Religious Studies', 'Home Economics', 'Agriculture', 'Moral Education', 'Pre-reading', 'Pre-writing', 'Pre-maths',
-];
+import { ALL_SUBJECTS, defaultSubjects } from './levels.js';
+// Subject names offered as suggestions (nursery, primary and secondary, English- and French-speaking).
+export const SUBJECTS = [...new Set([
+  ...ALL_SUBJECTS, 'Music', 'Home Economics', 'Agriculture', 'Moral Education', 'Commerce', 'Accounting', 'Food and Nutrition',
+  'Technical Drawing', 'Logic', 'Additional Mathematics', 'Physics with Chemistry',
+])];
 
 /** "Mathematics: Class 5, Class 6" lines for a staff member's teaching assignments. */
 export const teachingLines = (staff, classes) => (staff.teaching || [])
@@ -11,16 +11,11 @@ export const teachingLines = (staff, classes) => (staff.teaching || [])
   .map((t) => ({ subject: t.subject, classes: classes.filter((c) => (t.classIds || []).includes(c.id)).sort((a, b) => a.order - b.order) }));
 
 // Default subjects and coefficients when the school hasn't set a class's own list yet.
-const NURSERY = ['Pre-reading', 'Pre-writing', 'Pre-maths', 'Rhymes and Songs', 'Arts and Crafts', 'Physical Education', 'Social Habits'];
-const PRIMARY = [
-  ['English Language', 2], ['French', 2], ['Mathematics', 2], ['Science and Technology', 1], ['Social Studies', 1],
-  ['Citizenship', 1], ['National Languages and Cultures', 1], ['ICT', 1], ['Physical Education', 1], ['Arts and Crafts', 1],
-];
 
 /** A class's subjects with coefficients: [{ name, coef }]. */
 export function classSubjects(cls) {
   if (cls?.subjects?.length) return cls.subjects;
-  return /nursery/i.test(`${cls?.level || ''} ${cls?.name || ''}`) ? NURSERY.map((name) => ({ name, coef: 1 })) : PRIMARY.map(([name, coef]) => ({ name, coef }));
+  return defaultSubjects(cls);
 }
 
 /** Weighted average out of 20 of the subjects that have a mark, or null when none has. */

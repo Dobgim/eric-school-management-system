@@ -79,6 +79,23 @@ Tables ([server/schema.sql](server/schema.sql)):
   - nobody can edit the activity log.
 - **Online payments run on the server** ([server/momo.js](server/momo.js)). The browser never decides that money was received.
 
+## Nursery, primary and secondary schools
+
+The system works for nursery, primary and secondary schools, in both the English-speaking and the French-speaking sub-system.
+
+1. In **School Profile → Classes**, tap **Add classes for a level**, then choose the level and the sub-system:
+
+   | Level | English-speaking | French-speaking |
+   | --- | --- | --- |
+   | Nursery | Pre-Nursery – Nursery 2 | Petite – Grande section |
+   | Primary | Class 1 – 6 | SIL – CM2 |
+   | Secondary | Form 1 – Upper Sixth | 6e – Terminale |
+
+2. Each class comes with its usual subjects and coefficients. Secondary includes Biology, Chemistry, Physics, Further Mathematics, Philosophie and others.
+3. A secondary-only school can remove the empty nursery and primary classes in the same step.
+4. Adjust the subjects under **Academics → Subjects by class**.
+5. Promotion follows the class order (Class 6 → Form 1, Form 5 → Lower Sixth). Pupils can graduate from any class at the end of a cycle.
+
 ## Dashboards
 
 Each role opens on its own dashboard, starting with **"Needs your attention"** (things waiting for them, each one tap away):

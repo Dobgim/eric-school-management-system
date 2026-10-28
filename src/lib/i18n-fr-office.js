@@ -128,10 +128,18 @@ export const OFFICE = {
   'No staff register taken this month.': 'Aucun appel du personnel ce mois-ci.', 'Staff Attendance': 'Présences du personnel', 'Pupils’ registers by class, and the register of teachers and staff.': 'Appels des élèves par classe, et registre des enseignants et du personnel.',
   'Salary': 'Salaire', 'Type the salary': 'Saisir le salaire', 'Use a salary scale': 'Utiliser une grille', 'Basic salary (per month)': 'Salaire de base (par mois)', 'Own salary': 'Salaire propre', 'Not set': 'Non défini',
   '— Choose a scale —': '— Choisir une grille —',
+    'Secondary': 'Secondaire', 'Add classes for a level': 'Ajouter les classes d’un niveau', 'Sub-system': 'Sous-système', 'English-speaking (Anglophone)': 'Anglophone', 'French-speaking (Francophone)': 'Francophone',
+  'Classes to add': 'Classes à ajouter', 'Level': 'Niveau', 'Classes': 'Classes',
+  'Also remove the classes of other levels that have no pupils (for example, a secondary school that has no nursery or primary section).': 'Supprimer aussi les classes des autres niveaux sans élèves (par exemple, un établissement secondaire sans maternelle ni primaire).',
+  'Biology': 'Biologie', 'Chemistry': 'Chimie', 'Physics': 'Physique', 'Economics': 'Économie', 'Literature in English': 'Littérature anglaise', 'Computer Science': 'Informatique', 'Further Mathematics': 'Mathématiques approfondies',
+  'Form 1': 'Form 1', 'Lower Sixth': 'Lower Sixth', 'Upper Sixth': 'Upper Sixth',
     'Switch to English': 'Switch to English', 'Passer en français': 'Passer en français', 'Nothing yet.': 'Rien pour le moment.',
 };
 
 export const OFFICE_PATTERNS = [
+  [/^Add (\d+) class(es)?$/, 'Ajouter $1 classe(s)'],
+  [/^(\d+) class(es)? added with their subjects\.(.*)$/, '$1 classe(s) ajoutée(s) avec leurs matières.$3'],
+  [/^Each class comes with its usual subjects and coefficients \((.+)…\)\. Adjust them later under Academics → Subjects by class\.$/, 'Chaque classe reçoit ses matières et coefficients habituels ($1…). Ajustez-les ensuite dans Pédagogie → Matières par classe.'],
   [/^(\d+) subjects$/, '$1 matières'],
   [/^My attendance · (.+)$/, 'Mes présences · $1'],
   [/^Staff register · (.+)$/, 'Registre du personnel · $1'],

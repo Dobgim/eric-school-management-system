@@ -6,6 +6,7 @@ import { allTerms, billLines, currentTerm, feeStatus, payrollTotals, termPaid } 
 import { exportExcel, exportTablePDF } from '../lib/exporters';
 import { PAYMENT_METHODS, age, fmtDate, fullName, localDate, money, monthLabel, sum, today } from '../lib/utils';
 import { Card, DataTable, ExportButtons, Field, Input, PageHeader, Select } from '../components/ui';
+import { LEVELS, levelLabel } from '../lib/levels';
 
 const REPORTS = [
   { id: 'daily', label: 'Daily collection', icon: CalendarRange, group: 'financial' },
@@ -154,7 +155,7 @@ function Report({ id }) {
       case 'enrolment': {
         const rows = classes.map((c) => {
           const list = active.filter((s) => s.classId === c.id);
-          return { id: c.id, name: c.name, level: c.level === 'nursery' ? 'Nursery' : 'Primary', capacity: c.capacity, boys: list.filter((s) => s.gender === 'M').length, girls: list.filter((s) => s.gender === 'F').length, total: list.length, newPupils: list.filter((s) => s.isNew && s.sessionAdmitted === db.settings.currentSessionId).length, fill: `${Math.round((list.length / c.capacity) * 100)}%` };
+          return { id: c.id, name: c.name, level: levelLabel(c.level), capacity: c.capacity, boys: list.filter((s) => s.gender === 'M').length, girls: list.filter((s) => s.gender === 'F').length, total: list.length, newPupils: list.filter((s) => s.isNew && s.sessionAdmitted === db.settings.currentSessionId).length, fill: `${Math.round((list.length / c.capacity) * 100)}%` };
         });
         return {
           title: 'Enrolment per Class',
@@ -165,7 +166,7 @@ function Report({ id }) {
         };
       }
       case 'gender': {
-        const groups = [['Nursery', (s) => db.classes.find((c) => c.id === s.classId)?.level === 'nursery'], ['Primary', (s) => db.classes.find((c) => c.id === s.classId)?.level === 'primary'], ['Whole school', () => true]];
+        const groups = [...LEVELS.filter((l) => db.classes.some((c) => c.level === l.id)).map((l) => [l.label, (s) => db.classes.find((c) => c.id === s.classId)?.level === l.id]), ['Whole school', () => true]];
         const rows = groups.map(([name, fn]) => {
           const list = active.filter(fn);
           const boys = list.filter((s) => s.gender === 'M').length;
