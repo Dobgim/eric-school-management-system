@@ -15,6 +15,7 @@ import { setSecret } from './secrets.js';
 import { flushPush, pushStats, removeSubscription, saveSubscription, sendTest, vapidKeys } from './push.js';
 import { ensureSetup } from './setup.js';
 import { signupRoutes } from './signup.js';
+import { teacherRoutes } from './teachers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DIST = join(here, '..', 'dist');
@@ -90,7 +91,7 @@ app.get('/api/public/school', wrap(async (req, res) => {
 
 // ---- Auth
 app.post('/api/auth/login', wrap(async (req, res) => {
-  const { username = '', password = '', portal, remember = true } = req.body || {};
+  const { username = '', password = '', portal, remember = true, lang } = req.body || {};
   const key = `${req.ip}|${String(username).toLowerCase()}`;
   if (loginBlocked(key)) return res.status(429).json({ error: 'Too many attempts. Wait 15 minutes and try again.' });
   const conn = await db();
@@ -122,11 +123,12 @@ app.post('/api/auth/login', wrap(async (req, res) => {
   if (row.status === 'rejected') return res.status(403).json({ error: `Your sign-up was not approved${row.review_note ? `: ${row.review_note}` : '.'} Please contact the school office.` });
   if (!row.active) return res.status(403).json({ error: 'This account has been deactivated. Contact the administrator.' });
   if (portal === 'parent' && row.role !== 'parent') return res.status(403).json({ error: 'This is a staff account — use the Staff tab.' });
-  if (portal === 'staff' && row.role === 'parent') return res.status(403).json({ error: 'This is a parent account — use the Parents tab.' });
+  if ((portal === 'staff' || portal === 'teacher') && row.role === 'parent') return res.status(403).json({ error: 'This is a parent account — use the Parents tab.' });
   clearFailures(key);
   await conn.query('update users set last_login = now() where id = $1', [row.id]);
   await logEntry(conn.query, row.id, 'Signed in');
   setSessionCookie(req, res, row, { remember: remember !== false });
+  if (lang === 'fr' || lang === 'en') await conn.query('update users set lang = $2 where id = $1', [row.id, lang]);
   res.json({ user: toClientUser({ ...row, last_login: new Date() }) });
 }));
 
@@ -145,6 +147,14 @@ app.post('/api/auth/email', requireUser, wrap(async (req, res) => {
   }
   await conn.query('update users set email = $2 where id = $1', [req.user.id, email || null]);
   res.json({ ok: true, email });
+}));
+
+// Language for this person's phone notifications and SMS.
+app.post('/api/auth/lang', requireUser, wrap(async (req, res) => {
+  const lang = req.body?.lang === 'fr' ? 'fr' : 'en';
+  const conn = await db();
+  await conn.query('update users set lang = $2 where id = $1', [req.user.id, lang]);
+  res.json({ ok: true, lang });
 }));
 
 app.post('/api/auth/password', requireUser, wrap(async (req, res) => {
@@ -310,6 +320,7 @@ app.post('/api/push/unsubscribe', wrap(async (req, res) => {
 
 paymentRoutes(app, wrap, broadcast);
 signupRoutes(app, wrap, requireUser, broadcast);
+teacherRoutes(app, wrap, requireUser, broadcast);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 

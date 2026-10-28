@@ -5,6 +5,7 @@ import { request, useStore } from '../lib/store';
 import { Logo } from '../components/Layout';
 import { Button, Field, Input } from '../components/ui';
 import { PasswordInput } from './Signup';
+import LanguageSwitch from '../components/LanguageSwitch';
 
 /**
  * Parents prove who they are with details only they and the school know (their phone number plus
@@ -37,7 +38,10 @@ export default function ForgotPassword() {
   return (
     <div className="flex min-h-screen items-start justify-center bg-slate-100 px-4 py-8 sm:items-center sm:py-12">
       <div className="w-full max-w-md">
-        <Link to="/login" className="mb-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:underline"><ArrowLeft className="size-4" />Back to sign in</Link>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <Link to="/login" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:underline"><ArrowLeft className="size-4" />Back to sign in</Link>
+          <LanguageSwitch />
+        </div>
         <div className="card p-6 sm:p-8">
           <div className="mb-6 flex items-center gap-3">
             <Logo school={school} />

@@ -64,3 +64,6 @@ create table if not exists secrets (
   value text not null,
   updated_at timestamptz not null default now()
 );
+
+-- Language for phone notifications and SMS ('en' or 'fr').
+alter table users add column if not exists lang text not null default 'en';

@@ -1,19 +1,30 @@
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable/es';
+import baseAutoTable from 'jspdf-autotable/es';
 import { fmtDate, fmtDateTime, money } from './utils';
 import { markRemark, ordinal } from './subjects';
+import { t } from './i18n';
 
 const BRAND = [38, 76, 57];
 const ACCENT = [199, 134, 42];
 
 // Standard PDF fonts only cover Latin-1; normalise the few characters we use that fall outside it.
 const clean = (v) =>
-  String(v ?? '')
+  String(v ?? '').split('\n').map(t).join('\n')
     .replace(/[—–]/g, '-')
     .replace(/[‘’]/g, "'")
     .replace(/[“”]/g, '"')
     .replace(/…/g, '...')
     .replace(/[^\x00-\xFF]/g, '');
+
+// Every text written on a PDF (titles, table cells, labels) goes through clean(), and so is translated too.
+const cleanCells = (rows) => rows?.map((r) => r.map((c) => (typeof c === 'string' ? clean(c) : c && typeof c === 'object' && typeof c.content === 'string' ? { ...c, content: clean(c.content) } : c)));
+const autoTable = (doc, opts) => baseAutoTable(doc, { ...opts, head: cleanCells(opts.head), body: cleanCells(opts.body), foot: cleanCells(opts.foot) });
+function pdf(opts) {
+  const doc = new jsPDF(opts);
+  const write = doc.text.bind(doc);
+  doc.text = (s, ...rest) => write(Array.isArray(s) ? s.map((x) => clean(x)) : clean(s), ...rest);
+  return doc;
+}
 
 function drawCrest(doc, x, y, size) {
   doc.setFillColor(...BRAND);
@@ -90,7 +101,7 @@ function footer(doc) {
  * summary: optional [[label, value], ...] printed under the table
  */
 export function exportTablePDF({ school, title, subtitle, columns, rows, summary, filename, landscape }) {
-  const doc = new jsPDF({ orientation: landscape || columns.length > 6 ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+  const doc = pdf({ orientation: landscape || columns.length > 6 ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
   const startY = letterhead(doc, school, title, subtitle);
   autoTable(doc, {
     startY,
@@ -153,7 +164,7 @@ ${summary?.length ? `<Row/>${summary.map(([k, v]) => `<Row>${cell(k, 'bold')}${c
 }
 
 export function receiptPDF({ school, payment, student, className, term, lines, status, receivedBy }) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a5' });
+  const doc = pdf({ unit: 'mm', format: 'a5' });
   const w = doc.internal.pageSize.getWidth();
   let y = letterhead(doc, school, 'OFFICIAL RECEIPT', `Receipt No: ${payment.receiptNo}     Date: ${fmtDate(payment.date)}`);
   autoTable(doc, {
@@ -209,7 +220,7 @@ export function receiptPDF({ school, payment, student, className, term, lines, s
 }
 
 export function payslipPDF({ school, staff, grade, item, month }) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const doc = pdf({ unit: 'mm', format: 'a4' });
   const w = doc.internal.pageSize.getWidth();
   let y = letterhead(doc, school, `PAYSLIP - ${month.toUpperCase()}`, `Staff No: ${staff.staffNo}`);
   autoTable(doc, {
@@ -278,7 +289,7 @@ export function payslipPDF({ school, staff, grade, item, month }) {
  * cards: [{ student, className, term, record, subjects: [{ name, coef }], teacherName, nextTerm }]
  */
 export function reportCardsPDF({ school, cards, filename }) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const doc = pdf({ unit: 'mm', format: 'a4' });
   const w = doc.internal.pageSize.getWidth();
   cards.forEach((c, i) => {
     if (i) doc.addPage();
@@ -371,7 +382,7 @@ export function reportCardsPDF({ school, cards, filename }) {
 
 /** A weekly timetable grid (A4 landscape). rows: [{ time, kind, label, cells: [text per day] }] */
 export function timetablePDF({ school, title, subtitle, days, rows, filename }) {
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const doc = pdf({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const y = letterhead(doc, school, title, subtitle);
   autoTable(doc, {
     startY: y,

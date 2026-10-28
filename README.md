@@ -114,6 +114,15 @@ The parent gives their child's **registration number and date of birth**.
 
 A phone number already on the school's records can't be used for a new-family account. That parent must use the first path instead.
 
+### Teachers
+
+Teachers have their own tab on the sign-in page and their own sign-up form (**Teacher sign-up**). They give their full name, the class they are class teacher of (if any), and the subjects they teach with the classes for each. Only the school's real teachers can get in, in one of two ways:
+
+1. **Invitation code** from the school (super admin → Users & Activity → Staff invitations, role *Teacher*). The account opens at once.
+2. **Phone number already on the staff list.** The office first adds the teacher under *Staff* (category Teaching) with their phone. The account then waits for the **super admin** to approve it.
+
+Anyone else is refused. In both cases, the classes and subjects a teacher declares **only take effect once the office confirms them** (Sign-up requests → *Teachers to confirm*), with Confirm, Adjust or Refuse. These decide whose marks the teacher may enter.
+
 ### Staff: by invitation only
 
 Nobody can sign up as staff on their own.
@@ -137,6 +146,15 @@ Codes that are used, expired, cancelled or made up are refused, by the page and 
 - One phone number can't be used for two parent accounts.
 - A single connection is limited to 30 sign-ups per hour, and invitation look-ups are rate-limited too.
 - The logic is in [server/signup.js](server/signup.js), and the checks on what parents may submit are in [server/data.js](server/data.js).
+
+## Languages: English and Français
+
+Everyone can switch between **English** and **Français**. The switch is on the sign-in page and at the top of the app; the first choice follows the phone's language.
+
+- **What changes:** in French, the whole interface is shown in French, and so are report cards (*bulletins de notes*), receipts, payslips and other PDFs.
+- **Phone messages:** phone notifications and SMS reach each person in their own language.
+- **What doesn't change:** names and anything the school types (class names, messages) stay as entered.
+- **Where the wording lives:** all French text is in [src/lib/i18n-fr.js](src/lib/i18n-fr.js) and [src/lib/i18n-fr-office.js](src/lib/i18n-fr-office.js). New screens need their wording added there.
 
 ## What's included
 

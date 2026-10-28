@@ -2,6 +2,7 @@
 // of the people it is for, so it appears like a WhatsApp message even when the app is closed.
 // Keys: VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY on the server, or generated once and stored encrypted.
 import webpush from 'web-push';
+import { translateText } from '../src/lib/i18n-core.js';
 import { encrypt, getSecret } from './secrets.js';
 
 let vapid = null;
@@ -74,7 +75,7 @@ export async function flushPush(q, origin) {
   const { rows: subs } = await q('select endpoint, user_id, keys from push_subscriptions');
   if (!subs.length) return { notifications: rows.length, sent: 0 };
 
-  const { rows: users } = await q(`select id, role from users where status = 'active' and active`);
+  const { rows: users } = await q(`select id, role, lang from users where status = 'active' and active`);
   const { rows: all } = await q(`select data from records where collection = 'notifications'`);
   const isFor = (n, u) => (n.userIds || []).includes(u.id) || (n.roles || []).includes(u.role);
   const unread = (u) => all.filter(({ data: n }) => n.by !== u.id && isFor(n, u) && !(n.readBy || []).includes(u.id)).length;
@@ -84,7 +85,8 @@ export async function flushPush(q, origin) {
     for (const u of users.filter((x) => isFor(n, x) && x.id !== n.by)) {
       const mine = subs.filter((x) => x.user_id === u.id);
       if (!mine.length) continue;
-      const payload = JSON.stringify({ title: n.title, body: n.body || '', url: n.link || '/', tag: n.id, badge: unread(u) });
+      // In the person's own language (French or English).
+      const payload = JSON.stringify({ title: translateText(n.title, u.lang), body: translateText(n.body || '', u.lang), url: n.link || '/', tag: n.id, badge: unread(u) });
       jobs.push(deliver(q, mine, payload, origin).then((r) => { sent += r.sent; }));
     }
   }

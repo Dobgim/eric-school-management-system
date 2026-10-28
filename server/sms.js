@@ -2,6 +2,7 @@
 // Providers: Twilio, Africa's Talking, or any bulk-SMS company with a simple web link ("custom"),
 // e.g. https://provider.cm/api/send?user=X&pass=Y&to={to}&sender={sender}&text={message}
 // Keys are entered once by the super admin and stored encrypted; which messages go by SMS is in settings.sms.
+import { translateText } from '../src/lib/i18n-core.js';
 import { getSecret } from './secrets.js';
 import { normalizePhone } from './momo.js';
 
@@ -86,7 +87,7 @@ export async function flushSms(q) {
   const cfg = await smsConfig(q);
   if (!cfg?.provider) return null;
 
-  const { rows: parents } = await q(`select id, guardian_id from users where role = 'parent' and status = 'active' and active`);
+  const { rows: parents } = await q(`select id, guardian_id, lang from users where role = 'parent' and status = 'active' and active`);
   const { rows: guardians } = await q(`select id, data->>'phone' as phone from records where collection = 'guardians'`);
   const { rows: pushed } = await q('select distinct user_id from push_subscriptions');
   const hasApp = new Set(pushed.map((r) => r.user_id));
@@ -96,10 +97,16 @@ export async function flushSms(q) {
   let sent = 0;
   for (const n of due) {
     const users = parents.filter((u) => (n.userIds || []).includes(u.id) || (n.roles || []).includes('parent'));
-    const phones = users.filter((u) => !(opts.onlyWithoutApp && hasApp.has(u.id)))
-      .map((u) => guardians.find((g) => g.id === u.guardian_id)?.phone).filter(Boolean);
-    if (!phones.length) continue;
-    const r = await sendSms(cfg, phones, `${name}: ${n.title}. ${n.body || ''}`.trim());
+    const to = users.filter((u) => !(opts.onlyWithoutApp && hasApp.has(u.id)));
+    if (!to.length) continue;
+    const r = { sent: 0, failed: 0 };
+    // One text per language, so each parent reads it in French or English.
+    for (const lang of new Set(to.map((u) => u.lang || 'en'))) {
+      const phones = to.filter((u) => (u.lang || 'en') === lang).map((u) => guardians.find((g) => g.id === u.guardian_id)?.phone).filter(Boolean);
+      const out = await sendSms(cfg, phones, `${name}: ${translateText(n.title, lang)}. ${translateText(n.body || '', lang)}`.trim());
+      r.sent += out.sent;
+      r.failed += out.failed;
+    }
     sent += r.sent;
     const entry = { id: `lg${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, userId: n.by || 'system', action: 'SMS sent', details: `${n.title} · ${r.sent} sent${r.failed ? `, ${r.failed} failed` : ''}`, at: new Date().toISOString() };
     await q(`insert into records (collection, id, data, updated_by) values ('activityLog', $1, $2::jsonb, 'system')`, [entry.id, JSON.stringify(entry)]);

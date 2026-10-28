@@ -6,6 +6,7 @@ import { homePath } from '../lib/permissions';
 import { fmtDate } from '../lib/utils';
 import { Logo } from '../components/Layout';
 import { Button, Field, Input, Select } from '../components/ui';
+import LanguageSwitch from '../components/LanguageSwitch';
 
 export function PasswordInput({ value, onChange }) {
   const [show, setShow] = useState(false);
@@ -180,6 +181,7 @@ function Shell({ school, children }) {
   return (
     <div className="flex min-h-screen items-start justify-center bg-slate-100 px-4 py-8 sm:items-center sm:py-12">
       <div className="w-full max-w-xl">
+        <div className="mb-3 flex justify-end"><LanguageSwitch /></div>
         <div className="mb-6 flex items-center justify-center gap-3">
           <Logo school={school} />
           <p className="font-bold text-slate-900">{school.name}</p>

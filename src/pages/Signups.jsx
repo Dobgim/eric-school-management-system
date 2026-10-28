@@ -15,7 +15,8 @@ export default function Signups() {
   const [reject, setReject] = useState(null);
   const [busy, setBusy] = useState(false);
   const [toast, notify] = useToast();
-  const requests = db.users.filter((u) => u.requestedRole && (user.role === 'superadmin' || u.requestedRole === 'parent'));
+  // Teachers who signed up themselves are handled in “Teachers to confirm” below.
+  const requests = db.users.filter((u) => u.requestedRole && !u.signup?.teacher && (user.role === 'superadmin' || u.requestedRole === 'parent'));
   const rows = requests.filter((u) => (tab === 'pending' ? u.status === 'pending' : u.status !== 'pending')).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 
   const openApprove = (u) => {
@@ -63,7 +64,8 @@ export default function Signups() {
   return (
     <>
       {toast}
-      <PageHeader title="Sign-up requests" subtitle="Parents whose details couldn’t be matched to a pupil automatically. Confirm which children are theirs. (Staff join with an invitation instead — see Users & Activity.)" />
+      <PageHeader title="Sign-up requests" subtitle="Teachers who signed up, and parents whose details couldn’t be matched to a pupil automatically." />
+      <TeacherRequests notify={notify} />
       <Tabs tabs={[{ id: 'pending', label: 'Waiting', count: pendingCount }, { id: 'done', label: 'Handled' }]} value={tab} onChange={setTab} />
       <Card bodyClass="">
         <DataTable
@@ -151,5 +153,98 @@ export default function Signups() {
         {reject && <Field label="Reason (shown when they try to sign in)"><Textarea value={reject.reason} onChange={(e) => setReject({ ...reject, reason: e.target.value })} placeholder="e.g. We could not match your child — please visit the office with the admission letter." /></Field>}
       </Modal>
     </>
+  );
+}
+
+/**
+ * Teachers who signed up and said what they teach. Nothing they declared counts until confirmed here; a teacher
+ * who joined with their phone number (no invitation) also needs the super admin to approve the account itself.
+ */
+function TeacherRequests({ notify }) {
+  const { db, api, user } = useStore();
+  const [editing, setEditing] = useState(null);
+  const [refuse, setRefuse] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const list = db.staff.filter((s) => s.teachingRequest);
+  if (!list.length) return null;
+  const className = (id) => db.classes.find((c) => c.id === id)?.name || '?';
+
+  const confirm = async (s, body = {}) => {
+    setBusy(true);
+    try {
+      await api.request(`/api/teachers/${s.id}/confirm`, { method: 'POST', body });
+      await api.reload();
+      notify(`${s.teachingRequest.name} confirmed. They can now enter marks for their subjects.`);
+      setEditing(null);
+    } catch (e) { notify(e.message); } finally { setBusy(false); }
+  };
+  const doRefuse = async () => {
+    setBusy(true);
+    try {
+      await api.request(`/api/teachers/${refuse.s.id}/reject`, { method: 'POST', body: { reason: refuse.reason } });
+      await api.reload();
+      notify('Refused. The person sees your reason.');
+      setRefuse(null);
+    } catch (e) { notify(e.message); } finally { setBusy(false); }
+  };
+
+  return (
+    <Card title="Teachers to confirm" className="mb-6" bodyClass="">
+      <ul className="divide-y divide-slate-100">
+        {list.map((s) => {
+          const r = s.teachingRequest;
+          const onRecord = s.phone && r.phone && digits(s.phone) === digits(r.phone);
+          const superOnly = r.pendingAccount && user.role !== 'superadmin';
+          return (
+            <li key={s.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-800">{r.name} {r.pendingAccount ? <Badge tone="amber">New account to approve</Badge> : <Badge tone="blue">Account open · classes to confirm</Badge>}</p>
+                <p className="text-xs text-slate-500">{r.phone} · staff record {s.staffNo} ({s.firstName} {s.lastName}) · {fmtDateTime(r.at)}</p>
+                {r.pendingAccount && <p className={`mt-1 text-xs ${onRecord ? 'text-emerald-700' : 'text-rose-700'}`}>{onRecord ? 'Phone number matches this staff record. Check it is really this teacher before approving.' : 'Phone number does not match the staff record.'}</p>}
+                <ul className="mt-2 space-y-0.5 text-sm text-slate-700">
+                  {r.classTeacherOf && <li><b>Class teacher of</b> {className(r.classTeacherOf)}</li>}
+                  {r.teaching.map((t) => <li key={t.subject}><b>{t.subject}</b> · {t.classIds.map(className).join(', ')}</li>)}
+                </ul>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="secondary" icon={XCircle} disabled={busy || superOnly} onClick={() => setRefuse({ s, reason: '' })}>Refuse</Button>
+                <Button size="sm" variant="secondary" disabled={busy || superOnly} onClick={() => setEditing({ s, teaching: r.teaching.map((t) => ({ ...t })), classTeacherOf: r.classTeacherOf || '' })}>Adjust</Button>
+                <Button size="sm" icon={CheckCircle2} disabled={busy || superOnly} onClick={() => confirm(s)}>{r.pendingAccount ? 'Approve' : 'Confirm'}</Button>
+              </div>
+              {superOnly && <p className="w-full text-xs text-slate-500">Only the super admin can approve a new teacher account.</p>}
+            </li>
+          );
+        })}
+      </ul>
+      {editing && (
+        <Modal open onClose={() => setEditing(null)} title={`What ${editing.s.teachingRequest.name} teaches`} size="lg" footer={<>
+          <Button variant="secondary" onClick={() => setEditing(null)}>Cancel</Button>
+          <Button icon={CheckCircle2} disabled={busy} onClick={() => confirm(editing.s, { teaching: editing.teaching, classTeacherOf: editing.classTeacherOf || null })}>{editing.s.teachingRequest.pendingAccount ? 'Approve' : 'Confirm'}</Button>
+        </>}>
+          <Field label="Class teacher of"><Select value={editing.classTeacherOf} onChange={(e) => setEditing({ ...editing, classTeacherOf: e.target.value })} placeholder="— Not a class teacher —" options={db.classes.map((c) => ({ value: c.id, label: c.name }))} /></Field>
+          <div className="mt-4 space-y-3">
+            {editing.teaching.map((t, i) => (
+              <div key={i} className="rounded-md bg-slate-50 p-3">
+                <div className="flex items-center justify-between"><b className="text-sm">{t.subject}</b><button type="button" className="text-xs font-semibold text-rose-600" onClick={() => setEditing({ ...editing, teaching: editing.teaching.filter((_, j) => j !== i) })}>Remove</button></div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {db.classes.map((c) => {
+                    const on = t.classIds.includes(c.id);
+                    return <button key={c.id} type="button" aria-pressed={on} onClick={() => setEditing({ ...editing, teaching: editing.teaching.map((x, j) => (j === i ? { ...x, classIds: on ? x.classIds.filter((id) => id !== c.id) : [...x.classIds, c.id] } : x)) })} className={`rounded-sm border px-2 py-1 text-xs font-medium ${on ? 'border-brand-700 bg-brand-700 text-white' : 'border-slate-300 bg-white text-slate-600'}`}>{c.name}</button>;
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
+      {refuse && (
+        <Modal open onClose={() => setRefuse(null)} title={`Refuse ${refuse.s.teachingRequest.name}`} footer={<>
+          <Button variant="secondary" onClick={() => setRefuse(null)}>Cancel</Button>
+          <Button variant="danger" disabled={busy || !refuse.reason.trim()} onClick={doRefuse}>Refuse</Button>
+        </>}>
+          <Field label="Reason (the person sees this)"><Textarea value={refuse.reason} onChange={(e) => setRefuse({ ...refuse, reason: e.target.value })} placeholder="e.g. You are not on our staff list — please see the head teacher." /></Field>
+        </Modal>
+      )}
+    </Card>
   );
 }

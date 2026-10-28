@@ -11,6 +11,7 @@ import { ROLES, fmtDateTime } from '../lib/utils';
 import { Avatar } from './ui';
 import NotificationBell, { PushBanner } from './NotificationBell';
 import { InstallButton, UpdateBanner } from './InstallApp';
+import LanguageSwitch from './LanguageSwitch';
 
 export function Logo({ school, size = 'md' }) {
   const s = size === 'lg' ? 'size-16' : 'size-10';
@@ -67,7 +68,7 @@ const NAV = [
     { to: '/reports', label: 'Reports', icon: BarChart3, perm: ['reports.financial', 'reports.academic'] },
     { to: '/announcements', label: 'Announcements', icon: Megaphone, perm: 'announcements.edit' },
     { to: '/school', label: 'School Profile', icon: Building2, perm: 'school.view' },
-    { to: '/signups', label: 'Sign-up requests', icon: UserPlus, perm: 'signups', badge: (db) => db.users.filter((u) => u.status === 'pending').length },
+    { to: '/signups', label: 'Sign-up requests', icon: UserPlus, perm: 'signups', badge: (db) => db.users.filter((u) => u.status === 'pending' && !u.signup?.teacher).length + db.staff.filter((s) => s.teachingRequest).length },
     { to: '/users', label: 'Users & Activity', icon: ShieldCheck, perm: 'users' },
   ] },
 ];
@@ -185,6 +186,7 @@ export default function Layout() {
             <p className="truncate text-xs text-slate-500">Academic session</p>
             <p className="truncate text-sm font-bold text-slate-800">{term?.label}</p>
           </div>
+          <LanguageSwitch compact />
           <NotificationBell />
           <div className="flex items-center gap-2.5">
             <Avatar name={user.name} size="sm" />

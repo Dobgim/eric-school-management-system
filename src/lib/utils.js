@@ -1,6 +1,9 @@
 export const uid = (prefix = '') =>
   prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
+// Dates follow the chosen language (set by i18n.js); numbers keep the same grouping in both languages.
+const LOCALE = () => (globalThis.__sisLang === 'fr' ? 'fr-FR' : 'en-GB');
+
 export const money = (n, currency = 'XAF') =>
   `${Math.round(Number(n) || 0).toLocaleString('en-US')} ${currency}`;
 
@@ -10,11 +13,11 @@ export const fmtDate = (d) => {
   if (!d) return '—';
   const date = new Date(d);
   if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  return date.toLocaleDateString(LOCALE(), { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 export const fmtDateTime = (d) =>
-  d ? new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+  d ? new Date(d).toLocaleString(LOCALE(), { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 
 // Local calendar date (not UTC) so late-evening entries get the right day.
 export const localDate = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -24,7 +27,7 @@ export const thisMonth = () => localDate().slice(0, 7);
 export const monthLabel = (ym) => {
   if (!ym) return '—';
   const [y, m] = ym.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  return new Date(y, m - 1, 1).toLocaleDateString(LOCALE(), { month: 'long', year: 'numeric' });
 };
 
 export const age = (dob) => {

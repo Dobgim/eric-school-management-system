@@ -16,7 +16,7 @@ export const REQUEST_STATUS = {
   approved: ['green', 'Confirmed'],
   rejected: ['red', 'Rejected'],
   processing: ['blue', 'Waiting for phone approval'],
-  failed: ['red', 'Not completed'],
+  failed: ['red', 'Failed'],
 };
 
 export default function ParentDashboard() {

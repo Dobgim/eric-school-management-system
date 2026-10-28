@@ -42,6 +42,8 @@ export async function request(path, { method = 'GET', body } = {}) {
 function normalize(data) {
   const d = { ...data };
   for (const c of COLLECTIONS) d[c] ||= [];
+  // Pupils saved by older versions, imports or restored backups may lack these lists; screens rely on them.
+  d.students = d.students.map((s) => (Array.isArray(s.documents) && Array.isArray(s.guardianIds) ? s : { ...s, documents: s.documents || [], guardianIds: s.guardianIds || [] }));
   d.settings = { counters: {}, ...(d.settings || {}) };
   d.school ||= {};
   return d;
@@ -355,7 +357,7 @@ export function StoreProvider({ children }) {
 
   const login = useCallback(async (username, password, portal, remember = true) => {
     try {
-      const { user: u } = await request('/api/auth/login', { method: 'POST', body: { username, password, portal, remember } });
+      const { user: u } = await request('/api/auth/login', { method: 'POST', body: { username, password, portal, remember, lang: globalThis.__sisLang || 'en' } });
       try { localStorage.setItem(REMEMBER_KEY, remember ? '1' : '0'); } catch { /* storage blocked */ }
       await enter(u);
       return { user: u };

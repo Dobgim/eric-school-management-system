@@ -33,6 +33,7 @@ import MyWork from './pages/MyWork';
 import ParentAdmissions from './pages/ParentAdmissions';
 import Admissions from './pages/Admissions';
 import ForgotPassword from './pages/ForgotPassword';
+import TeacherSignup from './pages/TeacherSignup';
 import SchoolFees from './pages/SchoolFees';
 import Teachers from './pages/Teachers';
 import FeeStatus from './pages/FeeStatus';
@@ -51,6 +52,7 @@ export default function App() {
   if (!user) {
     return (
       <Routes>
+        <Route path="/signup/teacher" element={<TeacherSignup />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot" element={<ForgotPassword />} />
         <Route path="*" element={<Login />} />

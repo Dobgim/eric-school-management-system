@@ -6,6 +6,7 @@ import { homePath } from '../lib/permissions';
 import { Logo } from '../components/Layout';
 import { Button, Field, Input } from '../components/ui';
 import { InstallButton } from '../components/InstallApp';
+import LanguageSwitch from '../components/LanguageSwitch';
 
 const LAST_LOGIN = 'sis:last-login';
 
@@ -54,6 +55,7 @@ export default function Login() {
 
       <div className="flex items-center justify-center bg-white px-4 py-10 sm:px-8">
         <div className="w-full max-w-sm">
+          <div className="mb-6 flex justify-end"><LanguageSwitch /></div>
           <div className="mb-8 flex items-center gap-3 lg:hidden">
             <Logo school={school} />
             <p className="font-bold text-slate-900">{school.name}</p>
@@ -63,8 +65,8 @@ export default function Login() {
           {typeof navigator !== 'undefined' && !navigator.onLine && <p className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">You’re offline. Sign in once while connected — after that the app opens and shows your information without internet.</p>}
           {serverProblem && <p role="alert" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"><b>Can’t reach the school server.</b> {serverProblem}</p>}
 
-          <div className="mt-6 grid grid-cols-2 rounded-xl bg-slate-100 p-1 text-sm font-semibold">
-            {[['staff', 'Staff'], ['parent', 'Parents']].map(([id, label]) => (
+          <div className="mt-6 grid grid-cols-3 rounded-xl bg-slate-100 p-1 text-sm font-semibold">
+            {[['teacher', 'Teachers'], ['staff', 'Staff'], ['parent', 'Parents']].map(([id, label]) => (
               <button key={id} type="button" onClick={() => { setPortal(id); setError(''); }} className={`rounded-lg py-2 transition ${portal === id ? 'bg-white text-brand-800 shadow-sm' : 'text-slate-500'}`}>{label}</button>
             ))}
           </div>
@@ -98,6 +100,7 @@ export default function Login() {
             <p className="text-sm text-slate-600">New here?</p>
             <div className="mt-2 flex flex-wrap justify-center gap-2">
               <Link to="/signup"><Button variant="secondary" size="sm">Parent sign-up</Button></Link>
+              <Link to="/signup/teacher"><Button variant="secondary" size="sm">Teacher sign-up</Button></Link>
               <Link to="/signup?as=staff"><Button variant="secondary" size="sm">Staff: I have an invitation</Button></Link>
             </div>
           </div>
