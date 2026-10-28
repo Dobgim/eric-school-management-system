@@ -162,12 +162,15 @@ export function StoreProvider({ children }) {
       if (cancelled) return;
       stop = live === false || typeof EventSource === 'undefined' ? poll() : stream();
     });
-    return () => { cancelled = true; stop(); };
+    // A phone notification just arrived: fetch the new data now rather than at the next check.
+    const onPush = (e) => { if (e.data?.type === 'push') reload(); };
+    navigator.serviceWorker?.addEventListener('message', onPush);
+    return () => { cancelled = true; stop(); navigator.serviceWorker?.removeEventListener('message', onPush); };
   }, [user, reload]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function poll() {
     const tick = () => { if (document.visibilityState === 'visible' && !inFlight.current) reload(); };
-    const id = setInterval(tick, 10000);
+    const id = setInterval(tick, 5000);
     document.addEventListener('visibilitychange', tick);
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', tick); };
   }

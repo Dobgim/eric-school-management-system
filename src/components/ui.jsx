@@ -279,7 +279,7 @@ export function Avatar({ name, src, size = 'md' }) {
 export function Toast({ message, onDone }) {
   useEffect(() => {
     if (!message) return;
-    const t = setTimeout(onDone, 3200);
+    const t = setTimeout(onDone, Math.max(3200, message.length * 60)); // long messages stay long enough to read
     return () => clearTimeout(t);
   }, [message, onDone]);
   if (!message) return null;

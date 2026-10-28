@@ -11,7 +11,8 @@ if (!process.argv.includes('--yes')) {
 const conn = await db();
 console.log(`Resetting ${conn.kind}…`);
 await conn.tx(async (q) => {
-  for (const t of ['records', 'kv', 'counters', 'users']) await q(`delete from ${t}`);
+  // Phone registrations belong to the accounts being deleted. Saved keys (Fapshi, push) are configuration and stay.
+  for (const t of ['records', 'kv', 'counters', 'users', 'push_subscriptions']) await q(`delete from ${t}`);
 });
 await ensureSetup();
 await conn.close?.();

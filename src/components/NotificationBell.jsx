@@ -131,16 +131,50 @@ export default function NotificationBell() {
   );
 }
 
-/** Invitation on the parent's home screen to receive school messages like a WhatsApp message. */
-export function PushCard() {
+const DISMISS = 'sis:push-later';
+const later = () => { try { return Number(localStorage.getItem(DISMISS)) > Date.now(); } catch { return false; } };
+
+/**
+ * Shown at the top of the app on every device where phone notifications are not on yet, for parents and staff.
+ * Turning them on sends a test message straight away, so the person sees that it works.
+ */
+export function PushBanner() {
+  const { api } = useStore();
   const [state, setState] = useState('loading');
+  const [msg, setMsg] = useState('');
+  const [hidden, setHidden] = useState(later);
   useEffect(() => { pushState().then(setState).catch(() => setState('unsupported')); }, []);
-  if (state !== 'off') return null;
+
+  const turnOn = async () => {
+    setMsg('');
+    const next = await enablePush().catch(() => 'off');
+    setState(next);
+    if (next === 'on') {
+      try {
+        const r = await api.request('/api/push/test', { method: 'POST' });
+        setMsg(r.sent ? 'Done. A test notification was sent to this device.' : 'Turned on, but the test message could not be delivered. Try again in a minute.');
+      } catch (e) { setMsg(e.message); }
+    }
+  };
+  const close = () => { try { localStorage.setItem(DISMISS, String(Date.now() + 3 * 24 * 3600 * 1000)); } catch { /* private mode */ } setHidden(true); };
+
+  if (msg) {
+    return <p role="status" className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{msg}</p>;
+  }
+  if (hidden || !['off', 'ios-install', 'denied'].includes(state)) return null;
+  const text = {
+    off: <><b>Get school messages on this phone.</b> Announcements, receipts and personal messages arrive like a WhatsApp message, even when the app is closed.</>,
+    'ios-install': <><b>iPhone: to receive school notifications,</b> tap the Share button <span aria-hidden="true">⎙</span> in Safari, choose <b>Add to Home Screen</b>, open the app from the new icon, then tap <b>Turn on</b>.</>,
+    denied: <><b>Notifications are blocked on this device.</b> Open the browser’s site settings for this app, set Notifications to <b>Allow</b>, then reload.</>,
+  }[state];
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3">
       <BellRing className="size-5 shrink-0 text-brand-700" />
-      <p className="min-w-48 flex-1 text-sm text-brand-900"><b>Get school messages on your phone.</b> Announcements, payment receipts and personal messages arrive like a WhatsApp message, even when the app is closed.</p>
-      <button type="button" onClick={async () => setState(await enablePush().catch(() => 'off'))} className="rounded-md bg-brand-700 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-800">Turn on</button>
+      <p className="min-w-48 flex-1 text-sm text-brand-900">{text}</p>
+      <div className="flex gap-2">
+        {state === 'off' && <button type="button" onClick={turnOn} className="rounded-md bg-brand-700 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-800">Turn on</button>}
+        <button type="button" onClick={close} className="rounded-md px-2 py-2 text-sm font-semibold text-brand-800 hover:bg-brand-100">Later</button>
+      </div>
     </div>
   );
 }

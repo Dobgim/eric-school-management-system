@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { AtSign, KeyRound } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AtSign, BellRing, KeyRound } from 'lucide-react';
+import { enablePush, pushState } from '../lib/push';
 import { useStore } from '../lib/store';
 import { ROLES, fmtDateTime } from '../lib/utils';
 import { Button, Card, Field, Info, Input, PageHeader, useToast } from '../components/ui';
@@ -59,6 +60,7 @@ export default function Account() {
             <Button type="submit" variant="secondary" icon={AtSign} disabled={savingEmail || email.trim().toLowerCase() === (user.email || '')}>{savingEmail ? 'Saving…' : 'Save email'}</Button>
           </form>
         </Card>
+        <PhoneNotifications />
         <Card title="Change password">
           <form onSubmit={save} className="space-y-4">
             <Field label="Current password"><Input type="password" autoComplete="current-password" value={f.current} onChange={(e) => setF({ ...f, current: e.target.value })} required /></Field>
@@ -69,5 +71,35 @@ export default function Account() {
         </Card>
       </div>
     </>
+  );
+}
+
+/** Turn phone notifications on for this device, and check they arrive. */
+function PhoneNotifications() {
+  const { api } = useStore();
+  const [state, setState] = useState('loading');
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { pushState().then(setState).catch(() => setState('unsupported')); }, []);
+  const test = async () => {
+    setBusy(true);
+    setMsg('');
+    try {
+      let s = state;
+      if (s !== 'on') { s = await enablePush(); setState(s); }
+      if (s !== 'on') return setMsg(s === 'denied' ? 'Notifications are blocked. Allow them in the browser’s site settings, then try again.' : 'Notifications were not allowed.');
+      const r = await api.request('/api/push/test', { method: 'POST' });
+      setMsg(r.sent ? `Sent. You should see “Notifications are working” now (${r.sent} device${r.sent > 1 ? 's' : ''}).` : `Could not deliver to this device${r.errors?.length ? `: ${r.errors[0]}` : ''}. Try turning it on again.`);
+    } catch (e) { setMsg(e.message); } finally { setBusy(false); }
+  };
+  const label = { on: 'On for this device', off: 'Off on this device', denied: 'Blocked in browser settings', 'ios-install': 'iPhone: add the app to the Home Screen first', unsupported: 'Not supported by this browser', loading: '…' }[state];
+  return (
+    <Card title="Phone notifications">
+      <p className="text-sm text-slate-600">School announcements, payment receipts and personal messages arrive on this device even when the app is closed.</p>
+      <p className="mt-3 text-sm"><span className="text-slate-500">Status: </span><b className={state === 'on' ? 'text-emerald-700' : 'text-slate-800'}>{label}</b></p>
+      {state === 'ios-install' && <p className="mt-2 text-sm text-slate-600">In Safari, tap Share → <b>Add to Home Screen</b>, open the app from the new icon, and come back here.</p>}
+      {['on', 'off'].includes(state) && <Button className="mt-4" icon={BellRing} disabled={busy} onClick={test}>{busy ? 'Sending…' : state === 'on' ? 'Send a test notification' : 'Turn on and test'}</Button>}
+      {msg && <p className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">{msg}</p>}
+    </Card>
   );
 }

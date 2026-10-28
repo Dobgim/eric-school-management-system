@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Megaphone, Pencil, Pin, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { BellRing, Megaphone, Pencil, Pin, Plus, Trash2 } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { can } from '../lib/permissions';
 import { fmtDate, fullName, today, uid } from '../lib/utils';
@@ -47,23 +47,38 @@ export default function Announcements() {
   const [form, setForm] = useState(null);
   const [del, setDel] = useState(null);
   const [toast, notify] = useToast();
+  const [stats, setStats] = useState(null);
+  const loadStats = () => { if (edit) api.request('/api/push/stats').then(setStats).catch(() => {}); };
+  useEffect(() => { loadStats(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const save = async () => {
     if (!form.title.trim() || !form.body.trim()) return notify('Write a title and a message.');
     if (form.audience === 'personal' && !(form.guardianIds || []).length) return notify('Choose at least one parent.');
     const a = { ...form, guardianIds: form.audience === 'personal' ? form.guardianIds : [] };
     // Sent straight to the server, which notifies the parents (in the app and on their phones).
+    let res;
     try {
-      await api.request('/api/ops', { method: 'POST', body: { ops: [{ t: 'put', c: 'announcements', v: form.id ? a : { ...a, id: uid('an'), by: user.id } }] } });
+      res = await api.request('/api/ops', { method: 'POST', body: { ops: [{ t: 'put', c: 'announcements', v: form.id ? a : { ...a, id: uid('an'), by: user.id } }] } });
       await api.reload();
     } catch (e) { return notify(e.message); }
     api.log(form.id ? 'Edited announcement' : 'Posted announcement', form.title);
-    notify(form.id ? 'Announcement saved.' : form.audience === 'personal' ? 'Message sent. The parent is notified on their phone.' : 'Posted. Everyone it is for has been notified.');
+    const phones = res?.push?.sent || 0;
+    notify(form.id ? 'Announcement saved.'
+      : phones ? `${form.audience === 'personal' ? 'Message sent' : 'Posted'}. Delivered to ${phones} phone${phones > 1 ? 's' : ''} now, and shown on the bell in the app.`
+        : `${form.audience === 'personal' ? 'Message sent' : 'Posted'} and shown on the bell in the app. No phone received it: ${form.audience === 'personal' ? 'this parent has' : 'nobody it is for has'} turned on phone notifications yet.`);
+    loadStats();
     setForm(null);
   };
   return (
     <>
       {toast}
       <PageHeader title="Announcements" subtitle="Notices for parents (shown in the parents portal) and staff." actions={edit && <Button icon={Plus} onClick={() => setForm({ title: '', body: '', audience: 'all', guardianIds: [], date: today(), pinned: false })}>New announcement</Button>} />
+      {stats && (
+        <p className="mb-4 max-w-3xl rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+          <BellRing className="mr-1.5 inline size-4 text-brand-700" />
+          Phone notifications are on for <b className="text-slate-900">{stats.parents} of {stats.parentAccounts}</b> parent accounts and <b className="text-slate-900">{stats.staff}</b> staff.
+          {stats.parents < stats.parentAccounts && ' The others see new messages on the bell when they open the app; ask them to tap “Turn on” at the top of their app.'}
+        </p>
+      )}
       <div className="max-w-3xl">
         <AnnouncementList items={visibleAnnouncements(db, user)} onEdit={edit ? (a) => setForm({ ...a }) : null} onDelete={edit ? setDel : null} />
       </div>

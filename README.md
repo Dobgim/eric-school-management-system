@@ -195,7 +195,8 @@ A pupil moves to *Completed* automatically as soon as a payment covers their fee
 - **General announcements** (everyone, all parents, or staff) notify everyone they are for.
 - **Personal messages** go only to the parents chosen. Other parents can't see them.
 - Notifications appear on the bell in the top-right corner with the number of unread messages, and on the installed app's icon.
-- **On the phone:** a parent (or staff member) taps *Turn on* on their home screen or in the bell. School messages, receipts and payment results then arrive as phone notifications, like a WhatsApp message, even when the app is closed.
+- **On the phone:** every signed-in person sees a *Turn on* banner at the top of the app until they allow notifications on that device. Phones can't receive alerts before that: the browser requires the person's own tap. Turning on sends a test message straight away, and *My Account → Phone notifications* can send another at any time.
+- **For the office:** the Announcements page shows how many parent accounts have phone notifications on. After posting, it says how many phones the message reached. The person who posts does not get an alert for their own message. School messages, receipts and payment results then arrive as phone notifications, like a WhatsApp message, even when the app is closed.
 - This uses Web Push, so it works on Android and on computers. On iPhone it needs iOS 16.4 or later, with the app added to the Home Screen first.
 - Push keys are created automatically and stored encrypted. You can also set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`.
 - Signing out stops the alerts on that phone.

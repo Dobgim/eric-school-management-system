@@ -10,7 +10,7 @@ import { COUNTER_ACCESS, Forbidden, applyOps, loadAll, newId, nextCounter, viewF
 import { db } from './db.js';
 import { momoMode, normalizePhone } from './momo.js';
 import { paymentRoutes } from './payments.js';
-import { flushPush, removeSubscription, saveSubscription, vapidKeys } from './push.js';
+import { flushPush, pushStats, removeSubscription, saveSubscription, sendTest, vapidKeys } from './push.js';
 import { ensureSetup } from './setup.js';
 import { signupRoutes } from './signup.js';
 
@@ -37,7 +37,11 @@ app.use('/api', (req, res, next) => {
   if (req.method === 'GET' && !req.path.startsWith('/payments/online/')) return next();
   const json = res.json.bind(res);
   res.json = (body) => {
-    db().then((conn) => flushPush(conn.query)).catch((e) => console.error('push:', e.message)).finally(() => json(body));
+    // The answer says how many phones were reached, so the office can see that a message went out.
+    db().then((conn) => flushPush(conn.query, `${req.protocol}://${req.get('host')}`))
+      .then((push) => { if (push && body && typeof body === 'object' && !Array.isArray(body)) body.push = push; })
+      .catch((e) => console.error('push:', e.message))
+      .finally(() => json(body));
     return res;
   };
   next();
@@ -184,6 +188,15 @@ app.post('/api/push/subscribe', requireUser, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 // Allowed without a session: called while signing out, so the next person on this phone doesn't get these alerts.
+app.post('/api/push/test', requireUser, wrap(async (req, res) => {
+  const conn = await db();
+  res.json(await sendTest(conn.query, req.user, `${req.protocol}://${req.get('host')}`));
+}));
+app.get('/api/push/stats', requireUser, wrap(async (req, res) => {
+  if (!['superadmin', 'admin', 'bursar'].includes(req.user.role)) throw new Forbidden('Not allowed.');
+  const conn = await db();
+  res.json(await pushStats(conn.query));
+}));
 app.post('/api/push/unsubscribe', wrap(async (req, res) => {
   const conn = await db();
   await removeSubscription(conn.query, req.body?.endpoint);

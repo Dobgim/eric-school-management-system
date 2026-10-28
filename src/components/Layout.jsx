@@ -9,7 +9,7 @@ import { can } from '../lib/permissions';
 import { currentTerm } from '../lib/finance';
 import { ROLES, fmtDateTime } from '../lib/utils';
 import { Avatar } from './ui';
-import NotificationBell from './NotificationBell';
+import NotificationBell, { PushBanner } from './NotificationBell';
 import { InstallButton, UpdateBanner } from './InstallApp';
 
 export function Logo({ school, size = 'md' }) {
@@ -199,6 +199,7 @@ export default function Layout() {
         )}
         {saveError && <div className="no-print sticky top-[61px] z-20 bg-rose-600 px-4 py-2 text-center text-sm font-medium text-white">{saveError}</div>}
         <main className={`mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:py-8 ${user.role === 'parent' ? 'pb-28 lg:pb-8' : ''}`}>
+          <div className="no-print"><PushBanner /></div>
           <Outlet />
         </main>
       </div>

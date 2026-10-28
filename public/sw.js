@@ -1,6 +1,6 @@
 // Service worker: makes the app installable and lets it open without internet.
 // Bump VERSION when this file's caching rules change; new builds are picked up automatically.
-const VERSION = 'v6';
+const VERSION = 'v7';
 const SHELL = `sis-shell-${VERSION}`;
 const ASSETS = `sis-assets-${VERSION}`;
 const FONTS = `sis-fonts-${VERSION}`;
@@ -112,6 +112,8 @@ self.addEventListener('push', (event) => {
     if (typeof n.badge === 'number' && self.navigator.setAppBadge) {
       try { await (n.badge ? self.navigator.setAppBadge(n.badge) : self.navigator.clearAppBadge()); } catch { /* not supported */ }
     }
+    // An open app refreshes its data at once, so the message is on the bell immediately.
+    for (const c of await self.clients.matchAll({ type: 'window', includeUncontrolled: true })) c.postMessage({ type: 'push' });
     await self.registration.showNotification(n.title || 'School', {
       body: n.body || '', tag: n.tag, renotify: true, icon: '/icons/icon-192.png', badge: '/icons/icon-192.png',
       vibrate: [120, 60, 120], data: { url: n.url || '/' },
