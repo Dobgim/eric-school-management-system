@@ -40,6 +40,7 @@ import FeeStatus from './pages/FeeStatus';
 import Attendance from './pages/Attendance';
 import Expenses from './pages/Expenses';
 import Timetable from './pages/Timetable';
+import TeacherHome from './pages/TeacherHome';
 
 function Guard({ perm, children }) {
   const { user } = useStore();
@@ -88,6 +89,7 @@ export default function App() {
         <Route path="reports" element={g(['reports.financial', 'reports.academic'], <Reports />)} />
         <Route path="announcements" element={<Announcements />} />
         <Route path="users" element={g('users', <Users />)} />
+        <Route path="teacher" element={g('myclass', <TeacherHome />)} />
         <Route path="my-class" element={g('myclass', <MyClass />)} />
         <Route path="portal" element={g('portal', <ParentDashboard />)} />
         <Route path="portal/children" element={g('portal', <Portal />)} />

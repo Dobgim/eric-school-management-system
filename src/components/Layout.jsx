@@ -28,6 +28,7 @@ export function Logo({ school, size = 'md' }) {
 const NAV = [
   { group: 'Overview', items: [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard, perm: 'dashboard', end: true },
+    { to: '/teacher', label: 'Dashboard', icon: LayoutDashboard, perm: 'myclass', end: true },
     { to: '/my-class', label: 'My Class', icon: GraduationCap, perm: 'myclass' },
     { to: '/portal', label: 'Dashboard', icon: Home, perm: 'portal', end: true },
     { to: '/me', label: 'My Payslips', icon: Wallet, perm: 'me' },

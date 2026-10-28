@@ -79,6 +79,19 @@ Tables ([server/schema.sql](server/schema.sql)):
   - nobody can edit the activity log.
 - **Online payments run on the server** ([server/momo.js](server/momo.js)). The browser never decides that money was received.
 
+## Dashboards
+
+Each role opens on its own dashboard, starting with **"Needs your attention"** (things waiting for them, each one tap away):
+
+| Role | Dashboard |
+| --- | --- |
+| Super Admin / Proprietor | Whole school: pupils, staff, fees collected and owed, this month's money in vs out, today's attendance per class, marks entered per class, fees completed, salaries, recent payments, events. Waiting: teachers to confirm, sign-ups, admissions, payments to verify, registers not taken, backup due |
+| Bursar / Accountant | Finance: collected today and this term, debts, spending this month, fees completed, collections by month, payment methods, largest balances, salaries, low stock, recent payments. Waiting: payments to verify, unpaid salaries, low stock |
+| Admin / Secretary | School office: pupils, new this term, absent today, today's registers, enrolment, events, marks progress, quick links. Waiting: admissions, parent sign-ups, teachers to confirm, registers not taken |
+| Teacher | Their day: register reminder, today's lessons, their class, marks still to enter per subject and class, school news, shortcuts |
+| Staff (general) | Profile, payslips and school news |
+| Parent | Children, fees and payments, news (parent portal) |
+
 ## Roles
 
 | Role | Can |

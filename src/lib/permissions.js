@@ -24,7 +24,7 @@ export function can(user, perm) {
 export function homePath(user) {
   if (!user) return '/login';
   if (user.role === 'parent') return '/portal';
-  if (user.role === 'teacher') return '/my-class';
+  if (user.role === 'teacher') return '/teacher';
   if (user.role === 'staff') return '/me';
   return '/';
 }
