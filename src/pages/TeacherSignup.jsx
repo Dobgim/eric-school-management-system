@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Clock, GraduationCap, KeyRound, Plus, Trash2, UserCheck } from 'lucide-react';
 import { request, useStore } from '../lib/store';
 import { Logo } from '../components/Layout';
@@ -17,7 +17,9 @@ export default function TeacherSignup() {
   const nav = useNavigate();
   const [classes, setClasses] = useState([]);
   const [proof, setProof] = useState('code');
-  const [f, setF] = useState({ inviteCode: '', name: '', gender: 'F', phone: '', email: '', username: '', password: '', confirm: '', classTeacherOf: '' });
+  // Opening the link from an invitation fills in the code.
+  const [params] = useSearchParams();
+  const [f, setF] = useState({ inviteCode: (params.get('invite') || '').toUpperCase(), name: '', gender: 'F', phone: '', email: '', username: '', password: '', confirm: '', classTeacherOf: '' });
   const [teaching, setTeaching] = useState([{ subject: '', classIds: [] }]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);

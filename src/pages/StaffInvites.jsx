@@ -6,7 +6,8 @@ import { Badge, Button, Card, DataTable, Empty, Field, Input, Modal, Select, use
 
 const STAFF_ROLES = ['teacher', 'admin', 'bursar', 'staff'];
 const show = (c) => `${c.slice(0, 4)}-${c.slice(4)}`;
-const inviteLink = (code) => `${window.location.origin}/signup?invite=${show(code)}`;
+// Teachers go to the teacher sign-up (where they choose their classes and subjects); other staff to the staff form.
+const inviteLink = (code, role) => `${window.location.origin}${role === 'teacher' ? '/signup/teacher' : '/signup'}?invite=${show(code)}`;
 const status = (i) => (i.usedBy ? ['green', `Used by ${i.usedByName || 'someone'}`] : i.revoked ? ['slate', 'Cancelled'] : i.expiresAt < new Date().toISOString() ? ['red', 'Expired'] : ['amber', 'Waiting']);
 
 /** Staff can only create an account with an invitation made here (super admin). */
@@ -32,7 +33,7 @@ export default function StaffInvites() {
     try { await api.request(`/api/invites/${i.id}/revoke`, { method: 'POST' }); await api.reload(); notify('Invitation cancelled.'); } catch (e) { notify(e.message); }
   };
   const copy = async (text) => { try { await navigator.clipboard.writeText(text); notify('Copied.'); } catch { notify(text); } };
-  const message = (i) => `Hello${i.name ? ` ${i.name}` : ''}, you are invited to join ${db.school.name} on the school app as ${ROLES[i.role]}. Open ${inviteLink(i.code)} or use invitation code ${show(i.code)} (valid until ${fmtDate(i.expiresAt)}).`;
+  const message = (i) => `Hello${i.name ? ` ${i.name}` : ''}, you are invited to join ${db.school.name} on the school app as ${ROLES[i.role]}. Open ${inviteLink(i.code, i.role)} or use invitation code ${show(i.code)} (valid until ${fmtDate(i.expiresAt)}).`;
 
   return (
     <Card bodyClass="" title="Staff invitations" actions={<Button size="sm" icon={Plus} onClick={() => setForm({ role: 'teacher', name: '', position: '', staffId: '', days: 7 })}>Invite staff member</Button>}>
@@ -75,7 +76,7 @@ export default function StaffInvites() {
           <div className="space-y-4 text-center">
             <p className="text-sm text-slate-600">Send this to {created.name || 'the staff member'}. It works once, until {fmtDate(created.expiresAt)}.</p>
             <p className="rounded-xl bg-slate-50 py-4 font-mono text-3xl font-bold tracking-[0.2em] text-brand-900">{show(created.code)}</p>
-            <p className="text-xs break-all text-slate-500">{inviteLink(created.code)}</p>
+            <p className="text-xs break-all text-slate-500">{inviteLink(created.code, created.role)}</p>
             <div className="flex flex-wrap justify-center gap-2">
               <Button variant="secondary" icon={Copy} onClick={() => copy(message(created))}>Copy message</Button>
               <a href={`https://wa.me/?text=${encodeURIComponent(message(created))}`} target="_blank" rel="noreferrer"><Button variant="success" icon={MessageCircle}>Send by WhatsApp</Button></a>
